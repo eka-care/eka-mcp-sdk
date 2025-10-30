@@ -1,0 +1,1 @@
+# Tests for Eka.care MCP SDK

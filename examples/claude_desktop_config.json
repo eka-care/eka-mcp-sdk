@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "eka-care": {
+      "command": "eka-mcp-server",
+      "env": {
+        "EKA_CLIENT_ID": "your_client_id",
+        "EKA_CLIENT_SECRET": "your_client_secret",
+        "EKA_API_KEY": "your_api_key",
+        "EKA_API_BASE_URL": "https://api.eka.care",
+        "EKA_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

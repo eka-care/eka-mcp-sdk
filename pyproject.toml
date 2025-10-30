@@ -1,0 +1,54 @@
+[project]
+name = "eka-mcp-sdk"
+version = "0.1.0"
+description = "MCP Server for Eka.care APIs - Healthcare data integration for LLM applications"
+authors = [
+    { name = "Eka.care Team", email = "ekaconnect@eka.care" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "httpx>=0.24.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ekacare/eka-mcp-sdk"
+Documentation = "https://developer.eka.care"
+Repository = "https://github.com/ekacare/eka-mcp-sdk"
+Issues = "https://github.com/ekacare/eka-mcp-sdk/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[project.scripts]
+eka-mcp-server = "eka_mcp_sdk.server:main"

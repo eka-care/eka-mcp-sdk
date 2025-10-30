@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  eka-mcp-server:
+    build: .
+    container_name: eka-mcp-server
+    environment:
+      - EKA_CLIENT_ID=${EKA_CLIENT_ID}
+      - EKA_CLIENT_SECRET=${EKA_CLIENT_SECRET}
+      - EKA_API_KEY=${EKA_API_KEY}
+      - EKA_API_BASE_URL=https://api.eka.care
+      - EKA_MCP_SERVER_HOST=0.0.0.0
+      - EKA_MCP_SERVER_PORT=8000
+      - EKA_LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  logs:
