@@ -7,6 +7,7 @@ class EkaSettings(BaseSettings):
     """Configuration settings for Eka.care MCP Server."""
     model_config = SettingsConfigDict(
         env_file=".env",
+        env_prefix="EKASDK_",
         case_sensitive=False
     )
     
