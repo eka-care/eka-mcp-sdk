@@ -8,11 +8,25 @@ authors = [
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = ["mcp", "healthcare", "api", "eka.care", "llm", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
 dependencies = [
     "fastmcp>=2.0.0",
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -52,3 +66,9 @@ disallow_untyped_defs = true
 
 [project.scripts]
 eka-mcp-server = "eka_mcp_sdk.server:main"
+
+[project.entry-points."eka_mcp_sdk.plugins"]
+doctor_tools = "eka_mcp_sdk.tools.doctor_tools:register_doctor_tools"
+appointment_tools = "eka_mcp_sdk.tools.appointment_tools:register_appointment_tools"
+patient_tools = "eka_mcp_sdk.tools.patient_tools:register_patient_tools"
+prescription_tools = "eka_mcp_sdk.tools.prescription_tools:register_prescription_tools"

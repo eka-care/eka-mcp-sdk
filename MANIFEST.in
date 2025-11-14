@@ -1,0 +1,24 @@
+# Include documentation and configuration files
+include README.md
+include CLAUDE.md
+include TOOL_SELECTION_GUIDE.md
+include LICENSE
+include requirements*.txt
+include pyproject.toml
+
+# Include example configurations
+recursive-include examples *.json *.yml *.yaml
+
+# Include all Python files
+recursive-include eka_mcp_sdk *.py
+
+# Include test files
+recursive-include tests *.py
+
+# Exclude unnecessary files
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.egg-info
