@@ -12,13 +12,21 @@ logger = logging.getLogger(__name__)
 class AuthenticationManager:
     """Manages authentication for Eka.care APIs."""
     
-    def __init__(self):
+    def __init__(self, external_access_token: Optional[str] = None):
         self._auth_context: Optional[AuthContext] = None
         self._refresh_token: Optional[str] = None
+        self._external_access_token = external_access_token
         self._http_client = httpx.AsyncClient(timeout=30.0)
     
     async def get_auth_context(self) -> AuthContext:
         """Get valid authentication context."""
+        # If external access token is provided, use it directly
+        if self._external_access_token:
+            return AuthContext(
+                access_token=self._external_access_token,
+                api_key=None  # Not needed with access token
+            )
+        
         # Check if we have a valid access token
         if (self._auth_context and 
             not self._auth_context.is_token_expired):
@@ -34,6 +42,9 @@ class AuthenticationManager:
     
     async def _obtain_access_token(self) -> None:
         """Obtain access token using client credentials."""
+        if not settings.eka_client_id or not settings.eka_client_secret:
+            raise EkaAPIError("Client ID and Client Secret are required for authentication")
+            
         url = f"{settings.eka_api_base_url}/connect-auth/v1/account/login"
         payload = {
             "client_id": settings.eka_client_id,
@@ -63,8 +74,7 @@ class AuthenticationManager:
             
             # Store auth context
             self._auth_context = AuthContext(
-                access_token=token_response.access_token,
-                token_expires_at=datetime.now() + timedelta(seconds=token_response.expires_in),
+                access_token=token_response.access_token
             )
             self._refresh_token = token_response.refresh_token
             
@@ -106,9 +116,7 @@ class AuthenticationManager:
             
             # Update auth context
             self._auth_context = AuthContext(
-                access_token=token_response.access_token,
-                token_expires_at=datetime.now() + timedelta(seconds=token_response.expires_in),
-                api_key=settings.eka_api_key
+                access_token=token_response.access_token
             )
             self._refresh_token = token_response.refresh_token
             
@@ -130,4 +138,4 @@ class AuthenticationManager:
 
 
 # Global auth manager instance
-auth_manager = AuthenticationManager()
+auth_manager = AuthenticationManager(settings.eka_access_token)

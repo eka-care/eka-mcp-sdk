@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 import logging
 
-from ..auth.manager import auth_manager
+from ..auth.manager import auth_manager, AuthenticationManager
 from ..auth.models import EkaAPIError
 from ..config.settings import settings
 
@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 class BaseEkaClient(ABC):
     """Base client for Eka.care API interactions."""
     
-    def __init__(self):
+    def __init__(self, access_token: Optional[str] = None):
         self._http_client = httpx.AsyncClient(timeout=30.0)
+        self._auth_manager = auth_manager if access_token is None else AuthenticationManager(access_token)
     
     async def _make_request(
         self,
@@ -26,7 +27,7 @@ class BaseEkaClient(ABC):
         """Make authenticated request to Eka.care API."""
         try:
             # Get authentication context
-            auth_context = await auth_manager.get_auth_context()
+            auth_context = await self._auth_manager.get_auth_context()
             
             # Prepare request
             url = f"{settings.eka_api_base_url}{endpoint}"

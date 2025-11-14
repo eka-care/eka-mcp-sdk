@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+import base64
+import json
 
 
 class TokenResponse(BaseModel):
@@ -14,13 +16,31 @@ class TokenResponse(BaseModel):
 class AuthContext(BaseModel):
     """Authentication context for API requests."""
     access_token: str
-    token_expires_at: datetime
     api_key: Optional[str] = None
     
     @property
     def is_token_expired(self) -> bool:
-        """Check if the access token is expired."""
-        return datetime.now() >= self.token_expires_at
+        """Check if the access token is expired by parsing JWT exp claim."""
+        try:
+            # Parse JWT token to get exp claim
+            parts = self.access_token.split('.')
+            if len(parts) != 3:
+                return True  # Invalid JWT format
+            
+            # Decode payload (add padding if needed)
+            payload = parts[1]
+            payload += '=' * (4 - len(payload) % 4)
+            decoded = base64.urlsafe_b64decode(payload)
+            token_data = json.loads(decoded)
+            
+            exp_timestamp = token_data.get('exp')
+            if not exp_timestamp:
+                return False  # No expiry claim, assume valid
+            
+            return datetime.now().timestamp() >= exp_timestamp
+            
+        except Exception:
+            return True  # If parsing fails, assume expired
     
     @property
     def auth_headers(self) -> dict:
