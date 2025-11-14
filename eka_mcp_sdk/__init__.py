@@ -27,6 +27,7 @@ from .auth.models import AuthContext, EkaAPIError
 from .clients.base import BaseEkaClient
 from .clients.doctor_tools_client import DoctorToolsClient
 from .server import create_mcp_server, main
+from .sdk import EkaMCPSDK
 
 __all__ = [
     "__version__",
@@ -38,6 +39,7 @@ __all__ = [
     "EkaAPIError", 
     "BaseEkaClient",
     "DoctorToolsClient",
+    "EkaMCPSDK",
     "create_mcp_server",
     "main"
 ]

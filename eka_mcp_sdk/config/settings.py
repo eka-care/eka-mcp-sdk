@@ -17,21 +17,17 @@ class EkaSettings(BaseSettings):
     )
     
     # Authentication
-    eka_client_id: Optional[str] = Field(
-        default=None,
-        description="Eka.care client ID - get from ekaconnect@eka.care"
+    eka_client_id: str = Field(
+        default="eka-doctool-mcp",
+        description="Eka.care client ID - required for all API calls"
     )
     eka_client_secret: Optional[str] = Field(
         default=None,
-        description="Eka.care client secret - get from ekaconnect@eka.care"
+        description="Eka.care client secret - required only if not using external access token"
     )
     eka_api_key: Optional[str] = Field(
         default=None,
         description="Optional API key for additional authentication"
-    )
-    eka_access_token: Optional[str] = Field(
-        default=None,
-        description="External access token - if provided, client_id/secret not required"
     )
     
     # MCP Server Configuration

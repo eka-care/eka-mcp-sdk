@@ -16,7 +16,6 @@ class TokenResponse(BaseModel):
 class AuthContext(BaseModel):
     """Authentication context for API requests."""
     access_token: str
-    api_key: Optional[str] = None
     
     @property
     def is_token_expired(self) -> bool:
@@ -49,8 +48,6 @@ class AuthContext(BaseModel):
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
         }
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
         return headers
 
 

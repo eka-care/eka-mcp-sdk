@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from typing import Optional
 from fastmcp import FastMCP
 
 from .config.settings import settings
-from .auth.manager import auth_manager
+from .sdk import EkaMCPSDK
 from .tools.doctor_tools import register_doctor_tools
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def create_mcp_server() -> FastMCP:
     """Create and configure the MCP server."""
+    
     mcp = FastMCP(
         name="Eka.care EMR API Server",
         instructions="""
@@ -33,6 +35,7 @@ def create_mcp_server() -> FastMCP:
             "server_name": "Eka.care Healthcare API Server",
             "version": "0.1.0",
             "api_base_url": settings.eka_api_base_url,
+            "client_id": settings.eka_client_id,
             "available_modules": ["Doctor Tools"],
             "status": "running"
         }

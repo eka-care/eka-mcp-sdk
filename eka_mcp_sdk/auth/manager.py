@@ -137,5 +137,5 @@ class AuthenticationManager:
         await self._http_client.aclose()
 
 
-# Global auth manager instance
-auth_manager = AuthenticationManager(settings.eka_access_token)
+# Global auth manager instance for client credentials only
+auth_manager = AuthenticationManager()

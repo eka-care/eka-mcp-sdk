@@ -33,9 +33,8 @@ class BaseEkaClient(ABC):
             url = f"{settings.eka_api_base_url}{endpoint}"
             headers = auth_context.auth_headers
             
-            # Add client-id header for patient API endpoints
-            if "/profiles/v1/patient" in endpoint:
-                headers["client-id"] = settings.eka_client_id
+            # Add client-id header for all API calls
+            headers["client-id"] = settings.eka_client_id
             
             logger.info(f"Making {method} request to: {url}")
             if params:
