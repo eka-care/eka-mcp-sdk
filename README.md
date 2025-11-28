@@ -35,10 +35,9 @@ git clone https://github.com/ekacare/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with UV (recommended)
-uv sync                 # Install dependencies
-uv pip install -e .     # Install the package to make eka-mcp-server command available
+uv sync
 
-# Or with pip
+# Or with pip (creates system-wide command)
 pip install -e .
 ```
 
@@ -64,11 +63,15 @@ EKA_LOG_LEVEL=INFO
 ### Running the Server
 
 ```bash
-# After installing with uv pip install -e . or pip install -e .
+# With UV (recommended - no activation needed)
+uv run eka-mcp-server
+
+# Or activate the virtual environment first
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 eka-mcp-server
 
-# Or run directly with uv (without installing)
-uv run eka-mcp-server
+# Or with pip installation (if installed with pip install -e .)
+eka-mcp-server
 
 # Or run as a Python module
 python -m eka_mcp_sdk.server
@@ -78,7 +81,24 @@ python -m eka_mcp_sdk.server
 
 Add to your Claude Desktop MCP configuration:
 
-**Option 1: Using installed command (requires `uv pip install -e .` or `pip install -e .`)**
+**Option 1: Using uv (recommended after `uv sync`)**
+```json
+{
+  "mcpServers": {
+    "eka-care": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/eka-mcp-sdk", "eka-mcp-server"],
+      "env": {
+        "EKA_CLIENT_ID": "your_client_id",
+        "EKA_CLIENT_SECRET": "your_client_secret",
+        "EKA_API_KEY": "your_api_key"
+      }
+    }
+  }
+}
+```
+
+**Option 2: Using pip installation (after `pip install -e .`)**
 ```json
 {
   "mcpServers": {
@@ -94,14 +114,12 @@ Add to your Claude Desktop MCP configuration:
 }
 ```
 
-**Option 2: Using uv run (no installation required, just `uv sync`)**
+**Option 3: Direct path to venv script (after `uv sync`)**
 ```json
 {
   "mcpServers": {
     "eka-care": {
-      "command": "uv",
-      "args": ["run", "eka-mcp-server"],
-      "cwd": "/path/to/eka-mcp-sdk",
+      "command": "/path/to/eka-mcp-sdk/.venv/bin/eka-mcp-server",
       "env": {
         "EKA_CLIENT_ID": "your_client_id",
         "EKA_CLIENT_SECRET": "your_client_secret",
@@ -180,8 +198,7 @@ git clone https://github.com/ekacare/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with development dependencies
-uv sync --extra dev       # Install dependencies
-uv pip install -e .       # Install package in editable mode
+uv sync --extra dev
 
 # Run tests
 uv run pytest
