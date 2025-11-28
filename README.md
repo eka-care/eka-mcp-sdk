@@ -35,7 +35,8 @@ git clone https://github.com/ekacare/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with UV (recommended)
-uv sync
+uv sync                 # Install dependencies
+uv pip install -e .     # Install the package to make eka-mcp-server command available
 
 # Or with pip
 pip install -e .
@@ -61,6 +62,15 @@ EKA_LOG_LEVEL=INFO
 ```
 
 ### Running the Server
+
+```bash
+# After installing with uv pip install -e . or pip install -e .
+eka-mcp-server
+
+# Or run directly with uv (without installing)
+uv run eka-mcp-server
+
+# Or run as a Python module
 python -m eka_mcp_sdk.server
 ```
 
@@ -68,11 +78,30 @@ python -m eka_mcp_sdk.server
 
 Add to your Claude Desktop MCP configuration:
 
+**Option 1: Using installed command (requires `uv pip install -e .` or `pip install -e .`)**
 ```json
 {
   "mcpServers": {
     "eka-care": {
       "command": "eka-mcp-server",
+      "env": {
+        "EKA_CLIENT_ID": "your_client_id",
+        "EKA_CLIENT_SECRET": "your_client_secret",
+        "EKA_API_KEY": "your_api_key"
+      }
+    }
+  }
+}
+```
+
+**Option 2: Using uv run (no installation required, just `uv sync`)**
+```json
+{
+  "mcpServers": {
+    "eka-care": {
+      "command": "uv",
+      "args": ["run", "eka-mcp-server"],
+      "cwd": "/path/to/eka-mcp-sdk",
       "env": {
         "EKA_CLIENT_ID": "your_client_id",
         "EKA_CLIENT_SECRET": "your_client_secret",
@@ -151,7 +180,8 @@ git clone https://github.com/ekacare/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with development dependencies
-uv sync --extra dev
+uv sync --extra dev       # Install dependencies
+uv pip install -e .       # Install package in editable mode
 
 # Run tests
 uv run pytest
