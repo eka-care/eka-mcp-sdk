@@ -1,15 +1,10 @@
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
-from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
-    extract_clinic_summary
-)
+from ..core.doctor_clinic_service import DoctorClinicService
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +12,15 @@ logger = logging.getLogger(__name__)
 def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     """Register Doctor and Clinic Information MCP tools."""
     client = DoctorToolsClient()
+    doctor_clinic_service = DoctorClinicService(client)
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Get clinic and doctor details for the business"
+    )
     async def get_business_entities() -> Dict[str, Any]:
-        """
-        Get Clinic and Doctor details for the business.
-        
-        Returns:
-            Complete list of clinics and doctors associated with the business
-        """
+        """Returns complete list of clinics and doctors associated with the business."""
         try:
-            result = await client.get_business_entities()
+            result = await doctor_clinic_service.get_business_entities()
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -54,7 +47,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Basic doctor profile including specialties, contact info, and background only
         """
         try:
-            result = await client.get_doctor_profile(doctor_id)
+            result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -81,7 +74,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Basic clinic details including address, facilities, and services only
         """
         try:
-            result = await client.get_clinic_details(clinic_id)
+            result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -105,7 +98,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             List of services and specialties offered by the doctor
         """
         try:
-            result = await client.get_doctor_services(doctor_id)
+            result = await doctor_clinic_service.get_doctor_services(doctor_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -139,46 +132,10 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Complete doctor profile with enriched clinic details, services, and appointment history
         """
         try:
-            # Get basic doctor profile
-            doctor_profile = await client.get_doctor_profile(doctor_id)
-            
-            comprehensive_profile = {
-                "doctor_profile": doctor_profile,
-                "clinics": [],
-                "services": [],
-                "recent_appointments": []
-            }
-            
-            # Get associated clinics and enrich them
-            if include_clinics:
-                business_entities = await client.get_business_entities()
-                clinic_details = await _enrich_doctor_clinics(client, doctor_id, business_entities)
-                comprehensive_profile["clinics"] = clinic_details
-            
-            # Get doctor services
-            if include_services:
-                try:
-                    services = await client.get_doctor_services(doctor_id)
-                    comprehensive_profile["services"] = services
-                except Exception as e:
-                    logger.warning(f"Could not fetch services for doctor {doctor_id}: {str(e)}")
-                    comprehensive_profile["services"] = []
-            
-            # Get recent appointments with patient details
-            if include_recent_appointments:
-                try:
-                    recent_appointments = await client.get_appointments(
-                        doctor_id=doctor_id,
-                        page_no=0
-                    )
-                    # Enrich with patient details
-                    enriched_appointments = await _enrich_doctor_appointments(client, recent_appointments, appointment_limit)
-                    comprehensive_profile["recent_appointments"] = enriched_appointments
-                except Exception as e:
-                    logger.warning(f"Could not fetch recent appointments for doctor {doctor_id}: {str(e)}")
-                    comprehensive_profile["recent_appointments"] = []
-            
-            return {"success": True, "data": comprehensive_profile}
+            result = await doctor_clinic_service.get_comprehensive_doctor_profile(
+                doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
+            )
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -211,39 +168,10 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Complete clinic profile with enriched doctor details, services, and appointment history
         """
         try:
-            # Get basic clinic details
-            clinic_details = await client.get_clinic_details(clinic_id)
-            
-            comprehensive_profile = {
-                "clinic_details": clinic_details,
-                "doctors": [],
-                "services": [],
-                "recent_appointments": []
-            }
-            
-            # Get associated doctors and their services
-            if include_doctors or include_services:
-                business_entities = await client.get_business_entities()
-                doctors_info = await _enrich_clinic_doctors(client, clinic_id, business_entities, include_services)
-                comprehensive_profile["doctors"] = doctors_info["doctors"]
-                if include_services:
-                    comprehensive_profile["services"] = doctors_info["services"]
-            
-            # Get recent appointments with patient and doctor details
-            if include_recent_appointments:
-                try:
-                    recent_appointments = await client.get_appointments(
-                        clinic_id=clinic_id,
-                        page_no=0
-                    )
-                    # Enrich with patient and doctor details
-                    enriched_appointments = await _enrich_clinic_appointments(client, recent_appointments, appointment_limit)
-                    comprehensive_profile["recent_appointments"] = enriched_appointments
-                except Exception as e:
-                    logger.warning(f"Could not fetch recent appointments for clinic {clinic_id}: {str(e)}")
-                    comprehensive_profile["recent_appointments"] = []
-            
-            return {"success": True, "data": comprehensive_profile}
+            result = await doctor_clinic_service.get_comprehensive_clinic_profile(
+                clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit
+            )
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -255,6 +183,8 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
 
 
+# These functions are now handled by the DoctorClinicService class
+# Keeping for backward compatibility if needed
 async def _enrich_doctor_clinics(client: DoctorToolsClient, doctor_id: str, business_entities: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Enrich doctor profile with associated clinic details."""
     try:

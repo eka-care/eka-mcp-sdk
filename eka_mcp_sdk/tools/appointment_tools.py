@@ -1,15 +1,10 @@
-from typing import Any, Dict, Optional, List, Union
+from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from fastmcp import FastMCP
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
-from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
-    extract_clinic_summary
-)
+from ..core.appointment_service import AppointmentService
 
 logger = logging.getLogger(__name__)
 
@@ -17,26 +12,19 @@ logger = logging.getLogger(__name__)
 def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     client = DoctorToolsClient()
+    appointment_service = AppointmentService(client)
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Get available appointment slots for a doctor at a specific clinic on a given date"
+    )
     async def get_appointment_slots(
-        doctor_id: str,
-        clinic_id: str,
-        date: str
+        doctor_id: Annotated[str, "Doctor's unique identifier"],
+        clinic_id: Annotated[str, "Clinic's unique identifier"],
+        date: Annotated[str, "Date for appointment slots (YYYY-MM-DD format)"]
     ) -> Dict[str, Any]:
-        """
-        Get available appointment slots for a doctor at a specific clinic on a given date.
-        
-        Args:
-            doctor_id: Doctor's unique identifier
-            clinic_id: Clinic's unique identifier
-            date: Date for appointment slots (YYYY-MM-DD format)
-        
-        Returns:
-            Available appointment slots with timing and pricing information
-        """
+        """Returns available appointment slots with timing and pricing information."""
         try:
-            result = await client.get_appointment_slots(doctor_id, clinic_id, date)
+            result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, date)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -48,19 +36,15 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
-    async def book_appointment(appointment_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Book an appointment slot for a patient.
-        
-        Args:
-            appointment_data: Appointment details including patient, doctor, timing, and mode
-        
-        Returns:
-            Booked appointment details with confirmation
-        """
+    @mcp.tool(
+        description="Book an appointment slot for a patient"
+    )
+    async def book_appointment(
+        appointment_data: Annotated[Dict[str, Any], "Appointment details including patient, doctor, timing, and mode"]
+    ) -> Dict[str, Any]:
+        """Returns booked appointment details with confirmation."""
         try:
-            result = await client.book_appointment(appointment_data)
+            result = await appointment_service.book_appointment(appointment_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -100,8 +84,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Enriched appointments with patient names, doctor details, and clinic information
         """
         try:
-            # Get basic appointments
-            appointments_result = await client.get_appointments(
+            result = await appointment_service.get_appointments_enriched(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
                 patient_id=patient_id,
@@ -110,10 +93,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 page_no=page_no
             )
             
-            # Enrich with additional details
-            enriched_result = await _enrich_appointments_data(client, appointments_result)
-            
-            return {"success": True, "data": enriched_result}
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -151,7 +131,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointments with entity IDs only
         """
         try:
-            result = await client.get_appointments(
+            result = await appointment_service.get_appointments_basic(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
                 patient_id=patient_id,
@@ -189,16 +169,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Complete appointment details with enriched patient, doctor, and clinic information
         """
         try:
-            # Get basic appointment details
-            appointment_result = await client.get_appointment_details(appointment_id, partner_id)
-            
-            # Enrich with additional details (treat as single-item list)
-            enriched_result = await _enrich_appointments_data(client, {"appointments": [appointment_result]})
-            
-            # Return the single enriched appointment
-            enriched_appointment = enriched_result.get("appointments", [{}])[0] if enriched_result.get("appointments") else appointment_result
-            
-            return {"success": True, "data": enriched_appointment}
+            result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -228,7 +200,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointment details with entity IDs only
         """
         try:
-            result = await client.get_appointment_details(appointment_id, partner_id)
+            result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -259,13 +231,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             List of enriched appointments for the patient with doctor and clinic information
         """
         try:
-            # Get basic appointments
-            appointments_result = await client.get_patient_appointments(patient_id, limit)
-            
-            # Enrich with additional details
-            enriched_result = await _enrich_appointments_data(client, appointments_result)
-            
-            return {"success": True, "data": enriched_result}
+            result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -295,7 +262,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointments with entity IDs only
         """
         try:
-            result = await client.get_patient_appointments(patient_id, limit)
+            result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -325,7 +292,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Updated appointment details
         """
         try:
-            result = await client.update_appointment(appointment_id, update_data, partner_id)
+            result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -353,7 +320,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Completion confirmation with updated appointment status
         """
         try:
-            result = await client.complete_appointment(appointment_id, completion_data)
+            result = await appointment_service.complete_appointment(appointment_id, completion_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -381,7 +348,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Cancellation confirmation with updated appointment status
         """
         try:
-            result = await client.cancel_appointment(appointment_id, cancel_data)
+            result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -409,7 +376,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Rescheduled appointment details with new timing
         """
         try:
-            result = await client.reschedule_appointment(appointment_id, reschedule_data)
+            result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -422,6 +389,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
 
+# This function is now handled by the AppointmentService class
+# Keeping for backward compatibility if needed
 async def _enrich_appointments_data(client: DoctorToolsClient, appointments_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Unified function to enrich appointment data with patient, doctor, and clinic details.

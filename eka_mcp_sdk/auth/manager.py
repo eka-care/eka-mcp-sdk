@@ -5,6 +5,7 @@ import logging
 
 from ..config.settings import settings
 from .models import TokenResponse, AuthContext, EkaAPIError
+from .storage import FileTokenStorage
 
 logger = logging.getLogger(__name__)
 
@@ -12,22 +13,34 @@ logger = logging.getLogger(__name__)
 class AuthenticationManager:
     """Manages authentication for Eka.care APIs."""
     
-    def __init__(self, external_access_token: Optional[str] = None):
+    def __init__(self, access_token: Optional[str] = None):
         self._auth_context: Optional[AuthContext] = None
         self._refresh_token: Optional[str] = None
-        self._external_access_token = external_access_token
+        self._external_access_token = access_token
         self._http_client = httpx.AsyncClient(timeout=30.0)
+        
+        # Only use storage when not using external access token
+        self._storage = None if access_token else FileTokenStorage()
     
     async def get_auth_context(self) -> AuthContext:
         """Get valid authentication context."""
-        # If external access token is provided, use it directly
+        # If external access token is provided, use it directly - no storage/refresh logic
         if self._external_access_token:
             return AuthContext(
-                access_token=self._external_access_token,
-                api_key=None  # Not needed with access token
+                access_token=self._external_access_token
             )
         
-        # Check if we have a valid access token
+        # For client credentials flow only: check memory, storage, then refresh/login
+        # Check if we have a valid access token in memory
+        if (self._auth_context and 
+            not self._auth_context.is_token_expired):
+            return self._auth_context
+        
+        # Try to load tokens from storage if available
+        if self._storage and not self._auth_context:
+            await self._load_tokens_from_storage()
+        
+        # Check again after loading from storage
         if (self._auth_context and 
             not self._auth_context.is_token_expired):
             return self._auth_context
@@ -40,16 +53,44 @@ class AuthenticationManager:
         
         return self._auth_context
     
+    def set_external_access_token(self, access_token: Optional[str]) -> None:
+        """Update the external access token. When set, disables storage and refresh logic."""
+        self._external_access_token = access_token
+        if access_token:
+            # Clear any stored auth context and storage when switching to external token
+            self._auth_context = None
+            self._refresh_token = None
+            self._storage = None
+        else:
+            # Re-enable storage when switching back to client credentials flow
+            self._storage = FileTokenStorage()
+    
+    async def _load_tokens_from_storage(self) -> None:
+        """Load tokens from storage."""
+        if not self._storage:
+            return
+            
+        try:
+            stored_tokens = await self._storage.get_tokens()
+            if stored_tokens:
+                self._auth_context = AuthContext(
+                    access_token=stored_tokens["access_token"]
+                )
+                self._refresh_token = stored_tokens["refresh_token"]
+                logger.debug("Tokens loaded from storage")
+        except Exception as e:
+            logger.warning(f"Failed to load tokens from storage: {str(e)}")
+    
     async def _obtain_access_token(self) -> None:
         """Obtain access token using client credentials."""
-        if not settings.eka_client_id or not settings.eka_client_secret:
+        if not settings.client_id or not settings.client_secret:
             raise EkaAPIError("Client ID and Client Secret are required for authentication")
             
-        url = f"{settings.eka_api_base_url}/connect-auth/v1/account/login"
+        url = f"{settings.api_base_url}/connect-auth/v1/account/login"
         payload = {
-            "client_id": settings.eka_client_id,
-            "client_secret": settings.eka_client_secret,
-            "api_key": settings.eka_api_key
+            "client_id": settings.client_id,
+            "client_secret": settings.client_secret,
+            "api_key": settings.api_key
         }
         
         logger.info(f"Making login request to: {url}")
@@ -78,6 +119,14 @@ class AuthenticationManager:
             )
             self._refresh_token = token_response.refresh_token
             
+            # Save to storage if available
+            if self._storage:
+                await self._storage.store_tokens(
+                    access_token=token_response.access_token,
+                    refresh_token=token_response.refresh_token,
+                    expires_in=token_response.expires_in
+                )
+            
             logger.info("Client credentials login successful")
             
         except httpx.HTTPStatusError as e:
@@ -91,7 +140,7 @@ class AuthenticationManager:
     
     async def _refresh_access_token(self) -> None:
         """Refresh access token using refresh token."""
-        url = f"{settings.eka_api_base_url}/connect-auth/v1/account/refresh"
+        url = f"{settings.api_base_url}/connect-auth/v1/account/refresh"
         payload = {"refreshToken": self._refresh_token}
         
         logger.info(f"Making refresh token request to: {url}")
@@ -120,6 +169,14 @@ class AuthenticationManager:
             )
             self._refresh_token = token_response.refresh_token
             
+            # Save to storage if available
+            if self._storage:
+                await self._storage.store_tokens(
+                    access_token=token_response.access_token,
+                    refresh_token=token_response.refresh_token,
+                    expires_in=token_response.expires_in
+                )
+            
             logger.info("Token refreshed successfully")
             
         except httpx.HTTPStatusError as e:
@@ -136,6 +193,3 @@ class AuthenticationManager:
         """Close HTTP client connections."""
         await self._http_client.aclose()
 
-
-# Global auth manager instance for client credentials only
-auth_manager = AuthenticationManager()

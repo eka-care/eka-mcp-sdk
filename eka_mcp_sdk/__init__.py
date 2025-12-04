@@ -1,18 +1,37 @@
 """
 Eka.care MCP SDK - Healthcare API integration for LLM applications.
 
-This package provides an MCP (Model Context Protocol) server that exposes
-Eka.care's healthcare APIs to LLM applications like Claude Desktop.
+This package provides multiple usage modes:
+
+1. MCP Server Mode - Traditional MCP server for Claude Desktop and other MCP clients
+2. Direct Library Mode - Use service classes directly in your applications  
+3. CrewAI Integration - Synchronous functions for CrewAI and other agent frameworks
+
+Usage Examples:
+
+MCP Server (Traditional):
+    # Install and run as MCP server
+    eka-mcp-server
+    
+Direct Library (Async):
+    from eka_mcp_sdk.core import PatientService, AppointmentService
+    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    
+    client = DoctorToolsClient()
+    patient_service = PatientService(client)
+    result = await patient_service.search_patients("john")
+
+CrewAI/Sync Integration:
+    from eka_mcp_sdk.lib import search_patients_sync, get_appointments_enriched_sync
+    
+    # Use in CrewAI tools or other sync contexts
+    patients = search_patients_sync("john", limit=10)
+    appointments = get_appointments_enriched_sync()
 
 For building remote MCP servers, import from eka_mcp_sdk.core:
-
     from eka_mcp_sdk.core import (
-        BaseEkaClient,
-        AuthenticationManager,
-        AuthContext,
-        EkaAPIError,
-        DoctorToolsClient,
-        EkaSettings
+        BaseEkaClient, AuthenticationManager, AuthContext,
+        EkaAPIError, DoctorToolsClient, EkaSettings
     )
 """
 
@@ -21,25 +40,22 @@ __author__ = "Eka.care Team"
 __email__ = "ekaconnect@eka.care"
 
 # Export main components for package-level imports
-from .config.settings import EkaSettings
-from .auth.manager import AuthenticationManager
+# Note: Avoiding circular imports by not importing from modules that depend on settings
 from .auth.models import AuthContext, EkaAPIError
-from .clients.base import BaseEkaClient
-from .clients.doctor_tools_client import DoctorToolsClient
-from .server import create_mcp_server, main
-from .sdk import EkaMCPSDK
+
+# Note: The following are available via direct import from their modules:
+# - EkaSettings from eka_mcp_sdk.config.settings  
+# - AuthenticationManager from eka_mcp_sdk.auth.manager
+# - DoctorToolsClient from eka_mcp_sdk.clients.doctor_tools_client
+# - create_mcp_server, main from eka_mcp_sdk.server
+# - EkaMCPSDK from eka_mcp_sdk.sdk
+# - Service classes from eka_mcp_sdk.core
+# - Sync functions from eka_mcp_sdk.lib
 
 __all__ = [
     "__version__",
     "__author__", 
     "__email__",
-    "EkaSettings",
-    "AuthenticationManager",
     "AuthContext",
-    "EkaAPIError", 
-    "BaseEkaClient",
-    "DoctorToolsClient",
-    "EkaMCPSDK",
-    "create_mcp_server",
-    "main"
+    "EkaAPIError"
 ]

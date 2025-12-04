@@ -1,5 +1,8 @@
 # Claude.ai Project Context
 
+## Instructions
+Always use context7 when I need code generation, setup or configuration steps, or library/API documentation. This means you should automatically use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
+
 ## Project Overview
 This is the Eka.care MCP SDK - a self-hosted Model Context Protocol (MCP) server that exposes Eka.care's healthcare APIs to LLM applications like Claude Desktop. The project enables seamless integration of healthcare data and services into AI-powered workflows.
 

@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 import logging
 
-from ..auth.manager import auth_manager, AuthenticationManager
+from ..auth.manager import AuthenticationManager
 from ..auth.models import EkaAPIError
 from ..config.settings import settings
 
@@ -15,7 +15,7 @@ class BaseEkaClient(ABC):
     
     def __init__(self, access_token: Optional[str] = None):
         self._http_client = httpx.AsyncClient(timeout=30.0)
-        self._auth_manager = auth_manager if access_token is None else AuthenticationManager(access_token)
+        self._auth_manager = AuthenticationManager(access_token)
     
     async def _make_request(
         self,
@@ -25,16 +25,20 @@ class BaseEkaClient(ABC):
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make authenticated request to Eka.care API."""
+        # Initialize url for exception handling
+        url = f"{settings.api_base_url}{endpoint}"
+        
         try:
             # Get authentication context
             auth_context = await self._auth_manager.get_auth_context()
             
             # Prepare request
-            url = f"{settings.eka_api_base_url}{endpoint}"
             headers = auth_context.auth_headers
             
             # Add client-id header for all API calls
-            headers["client-id"] = settings.eka_client_id
+            if not settings.client_id:
+                raise EkaAPIError("EKA_CLIENT_ID environment variable is required but not set")
+            headers["client-id"] = settings.client_id
             
             logger.info(f"Making {method} request to: {url}")
             if params:

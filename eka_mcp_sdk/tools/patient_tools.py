@@ -1,15 +1,10 @@
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
-from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_doctor_summary, 
-    extract_clinic_summary,
-    get_appointment_status_info
-)
+from ..core.patient_service import PatientService
 
 logger = logging.getLogger(__name__)
 
@@ -17,26 +12,19 @@ logger = logging.getLogger(__name__)
 def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     client = DoctorToolsClient()
+    patient_service = PatientService(client)
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Search patient profiles by username, mobile, or full name using prefix matching"
+    )
     async def search_patients(
-        prefix: str,
-        limit: Optional[int] = None,
-        select: Optional[str] = None
+        prefix: Annotated[str, "Search term to match against patient profiles (username, mobile, or full name)"],
+        limit: Annotated[Optional[int], "Maximum number of results to return (default: 50, max: 50)"] = None,
+        select: Annotated[Optional[str], "Comma-separated list of additional fields to include"] = None
     ) -> Dict[str, Any]:
-        """
-        Search patient profiles by username, mobile, or full name (prefix match).
-        
-        Args:
-            prefix: Search term to match against patient profiles (username, mobile, or full name)
-            limit: Maximum number of results to return (default: 50, max: 50)
-            select: Comma-separated list of additional fields to include
-        
-        Returns:
-            List of patients matching the search criteria
-        """
+        """Returns a list of patients matching the search criteria."""
         try:
-            result = await client.search_patients(prefix, limit, select)
+            result = await patient_service.search_patients(prefix, limit, select)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -48,22 +36,15 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
-    async def get_patient_details_basic(patient_id: str) -> Dict[str, Any]:
-        """
-        Get basic patient details by profile ID (profile data only).
-        
-        ⚠️  Consider using get_comprehensive_patient_profile instead for complete information.
-        Only use this if you specifically need basic patient data without appointment history.
-        
-        Args:
-            patient_id: Patient's unique identifier
-        
-        Returns:
-            Basic patient profile including personal and medical information only
-        """
+    @mcp.tool(
+        description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information."
+    )
+    async def get_patient_details_basic(
+        patient_id: Annotated[str, "Patient's unique identifier"]
+    ) -> Dict[str, Any]:
+        """Returns basic patient profile including personal and medical information only."""
         try:
-            result = await client.get_patient_details(patient_id)
+            result = await patient_service.get_patient_details_basic(patient_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -97,23 +78,10 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Complete patient profile with enriched appointment history including doctor and clinic details
         """
         try:
-            # Get basic patient details
-            patient_profile = await client.get_patient_details(patient_id)
-            
-            comprehensive_profile = {
-                "patient_profile": patient_profile,
-                "appointments": []
-            }
-            
-            if include_appointments:
-                # Get patient appointments
-                appointments_result = await client.get_patient_appointments(patient_id, appointment_limit)
-                
-                # Enrich appointments with doctor and clinic details
-                enriched_appointments = await _enrich_patient_appointments(client, appointments_result)
-                comprehensive_profile["appointments"] = enriched_appointments
-            
-            return {"success": True, "data": comprehensive_profile}
+            result = await patient_service.get_comprehensive_patient_profile(
+                patient_id, include_appointments, appointment_limit
+            )
+            return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
                 "success": False,
@@ -136,7 +104,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Created patient profile with oid identifier
         """
         try:
-            result = await client.add_patient(patient_data)
+            result = await patient_service.add_patient(patient_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -170,7 +138,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Paginated list of patient profiles
         """
         try:
-            result = await client.list_patients(page_no, page_size, select, from_timestamp, include_archived)
+            result = await patient_service.list_patients(page_no, page_size, select, from_timestamp, include_archived)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -198,7 +166,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Success message confirming profile update
         """
         try:
-            result = await client.update_patient(patient_id, update_data)
+            result = await patient_service.update_patient(patient_id, update_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -226,7 +194,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Success message confirming profile archival
         """
         try:
-            result = await client.archive_patient(patient_id, archive)
+            result = await patient_service.archive_patient(patient_id, archive)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -254,7 +222,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Patient profile(s) matching the mobile number
         """
         try:
-            result = await client.get_patient_by_mobile(mobile, full_profile)
+            result = await patient_service.get_patient_by_mobile(mobile, full_profile)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -267,6 +235,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
 
 
+# This function is now handled by the PatientService class
+# Keeping for backward compatibility if needed
 async def _enrich_patient_appointments(client: DoctorToolsClient, appointments_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Enrich patient appointments with doctor and clinic details.
