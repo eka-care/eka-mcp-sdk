@@ -37,6 +37,11 @@ cd eka-mcp-sdk
 # Install with UV (recommended)
 uv sync
 
+# Activate the virtual environment
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate     # On Windows
+
 # Or with pip
 pip install -e .
 ```
@@ -61,12 +66,41 @@ EKA_LOG_LEVEL=INFO
 ```
 
 ### Running the Server
+
+```bash
+# Make sure virtual environment is activated
+source .venv/bin/activate  # On macOS/Linux
+
+# Run the MCP server
+eka-mcp-server
+
+# Or alternatively
 python -m eka_mcp_sdk.server
 ```
 
 ## Usage with Claude Desktop
 
-Add to your Claude Desktop MCP configuration:
+Add to your Claude Desktop MCP configuration. **Important**: Use the full path to the virtual environment's Python executable:
+
+```json
+{
+  "mcpServers": {
+    "eka-care": {
+      "command": "/absolute/path/to/eka-mcp-sdk/.venv/bin/python",
+      "args": ["-m", "eka_mcp_sdk.server"],
+      "env": {
+        "EKA_CLIENT_ID": "your_client_id",
+        "EKA_CLIENT_SECRET": "your_client_secret", 
+        "EKA_API_KEY": "your_api_key"
+      }
+    }
+  }
+}
+```
+
+### Alternative Configuration (if eka-mcp-server is in PATH)
+
+If you installed the package globally or added the virtual environment to your PATH:
 
 ```json
 {
@@ -170,6 +204,69 @@ uv run mypy .
 2. Implement MCP tools in `eka_mcp_sdk/tools/`
 3. Register tools in `server.py`
 4. Update documentation
+
+## Development
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone git@github.com:eka-care/eka-mcp-sdk.git
+cd eka-mcp-sdk
+
+# Install development dependencies with UV
+uv sync --dev
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run tests (if available)
+pytest
+
+# Run examples
+python examples/direct_usage.py
+python examples/crewai_usage.py  # Requires: pip install crewai
+```
+
+### Virtual Environment Management
+
+The project uses `uv` for dependency management. Key commands:
+
+```bash
+# Create/update virtual environment and install dependencies
+uv sync
+
+# Add a new dependency
+uv add package_name
+
+# Add a development dependency  
+uv add --dev package_name
+
+# Activate the virtual environment
+source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate     # Windows
+
+# Deactivate
+deactivate
+```
+
+### Running Examples
+
+Make sure the virtual environment is activated before running examples:
+
+```bash
+source .venv/bin/activate
+
+# Direct API usage
+python examples/direct_usage.py
+
+# CrewAI integration (requires crewai package)
+uv add crewai  # Install CrewAI
+python examples/crewai_usage.py
+
+# MCP server documentation
+cat examples/MCP_USAGE.md
+```
 
 ## Configuration Reference
 

@@ -7,6 +7,10 @@ The Eka.care MCP SDK includes a complete MCP server implementation with FastMCP 
 The SDK includes a built-in MCP server that you can run directly:
 
 ```bash
+# First, activate the virtual environment (if using uv)
+source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate     # Windows
+
 # Start the MCP server
 eka-mcp-server
 
@@ -16,13 +20,14 @@ python -m eka_mcp_sdk.server
 
 ## Claude Desktop Configuration
 
-Add this to your Claude Desktop MCP configuration file:
+Add this to your Claude Desktop MCP configuration file. **Important**: Use the full path to your virtual environment's Python executable:
 
 ```json
 {
   "mcpServers": {
     "eka-care": {
-      "command": "eka-mcp-server",
+      "command": "/absolute/path/to/eka-mcp-sdk/.venv/bin/python",
+      "args": ["-m", "eka_mcp_sdk.server"],
       "env": {
         "EKA_CLIENT_ID": "your_client_id",
         "EKA_CLIENT_SECRET": "your_client_secret",
@@ -33,19 +38,32 @@ Add this to your Claude Desktop MCP configuration file:
 }
 ```
 
-### Alternative: Full Python Path
+### Finding Your Python Path
 
-If you prefer to specify the full path:
+To find the correct path to your virtual environment's Python:
+
+```bash
+# Activate your virtual environment first
+source .venv/bin/activate
+
+# Then get the Python path
+which python
+# Example output: /Users/yourname/eka-mcp-sdk/.venv/bin/python
+```
+
+### Alternative: If eka-mcp-server is in PATH
+
+If you installed the package globally or added the virtual environment to your PATH:
 
 ```json
 {
   "mcpServers": {
     "eka-care": {
-      "command": "python",
-      "args": ["-m", "eka_mcp_sdk.server"],
+      "command": "eka-mcp-server",
       "env": {
-        "EKA_CLIENT_ID": "your_client_id", 
-        "EKA_CLIENT_SECRET": "your_client_secret"
+        "EKA_CLIENT_ID": "your_client_id",
+        "EKA_CLIENT_SECRET": "your_client_secret",
+        "EKA_API_KEY": "your_api_key"
       }
     }
   }
