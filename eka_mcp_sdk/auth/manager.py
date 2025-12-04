@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 import logging
 
-from ..config.settings import settings
+from ..config.settings import get_current_settings
 from .models import TokenResponse, AuthContext, EkaAPIError
 from .storage import FileTokenStorage
 
@@ -83,6 +83,7 @@ class AuthenticationManager:
     
     async def _obtain_access_token(self) -> None:
         """Obtain access token using client credentials."""
+        settings = get_current_settings()
         if not settings.client_id or not settings.client_secret:
             raise EkaAPIError("Client ID and Client Secret are required for authentication")
             
@@ -140,6 +141,7 @@ class AuthenticationManager:
     
     async def _refresh_access_token(self) -> None:
         """Refresh access token using refresh token."""
+        settings = get_current_settings()
         url = f"{settings.api_base_url}/connect-auth/v1/account/refresh"
         payload = {"refreshToken": self._refresh_token}
         

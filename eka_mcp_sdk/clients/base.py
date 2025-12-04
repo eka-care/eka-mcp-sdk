@@ -5,7 +5,7 @@ import logging
 
 from ..auth.manager import AuthenticationManager
 from ..auth.models import EkaAPIError
-from ..config.settings import settings
+from ..config.settings import get_current_settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 class BaseEkaClient(ABC):
     """Base client for Eka.care API interactions."""
     
-    def __init__(self, access_token: Optional[str] = None):
+    def __init__(self, access_token: Optional[str] = None, custom_headers: Optional[Dict[str, str]] = None):
         self._http_client = httpx.AsyncClient(timeout=30.0)
         self._auth_manager = AuthenticationManager(access_token)
+        self._custom_headers = custom_headers or {}
     
     async def _make_request(
         self,
@@ -25,7 +26,8 @@ class BaseEkaClient(ABC):
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make authenticated request to Eka.care API."""
-        # Initialize url for exception handling
+        # Get current settings and initialize url for exception handling
+        settings = get_current_settings()
         url = f"{settings.api_base_url}{endpoint}"
         
         try:
@@ -39,6 +41,10 @@ class BaseEkaClient(ABC):
             if not settings.client_id:
                 raise EkaAPIError("EKA_CLIENT_ID environment variable is required but not set")
             headers["client-id"] = settings.client_id
+            
+            # Add instance custom headers
+            if self._custom_headers:
+                headers.update(self._custom_headers)
             
             logger.info(f"Making {method} request to: {url}")
             if params:
