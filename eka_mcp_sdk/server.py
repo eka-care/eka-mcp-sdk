@@ -34,8 +34,8 @@ def create_mcp_server() -> FastMCP:
         return {
             "server_name": "Eka.care Healthcare API Server",
             "version": "0.1.0",
-            "api_base_url": settings.eka_api_base_url,
-            "client_id": settings.eka_client_id,
+            "api_base_url": settings.api_base_url,
+            "client_id": settings.client_id,
             "available_modules": ["Doctor Tools"],
             "status": "running"
         }
@@ -49,7 +49,7 @@ def create_mcp_server() -> FastMCP:
 def main():
     """Main entry point for the MCP server."""
     logger.info("Starting Eka.care MCP Server...")
-    logger.info(f"API base URL: {settings.eka_api_base_url}")
+    logger.info(f"API base URL: {settings.api_base_url}")
     
     mcp = create_mcp_server()
     mcp.run(transport="stdio")
