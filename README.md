@@ -31,7 +31,7 @@ You can easily add more API modules like:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ekacare/eka-mcp-sdk.git
+git clone git@github.com:eka-care/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with UV (recommended)
