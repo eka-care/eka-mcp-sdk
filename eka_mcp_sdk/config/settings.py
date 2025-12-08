@@ -1,7 +1,8 @@
-from pydantic import Field
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, Type, TypeVar
 from pathlib import Path
+import importlib
 
 T = TypeVar('T', bound='BaseEkaSettings')
 
@@ -95,6 +96,70 @@ def reset_settings() -> None:
     """Reset settings to None. Useful for testing."""
     global _current_settings
     _current_settings = None
+
+
+def load_settings_by_name(settings_name: str) -> BaseEkaSettings:
+    """
+    Load settings by name from the config module.
+    
+    Args:
+        settings_name: Name of the settings file (without .py extension)
+                      e.g., "oidc_settings" will load from oidc_settings.py
+    
+    Returns:
+        Settings instance
+        
+    Raises:
+        ImportError: If the settings file doesn't exist
+        AttributeError: If the expected settings class isn't found
+    """
+    try:
+        # Import the settings module
+        module = importlib.import_module(f"eka_mcp_sdk.config.{settings_name}")
+        
+        # Try common naming patterns for the settings class
+        class_names = [
+            f"{settings_name.replace('_', '').title().replace('Settings', '')}Settings",
+            f"{settings_name.split('_')[0].upper()}Settings",
+            f"{settings_name.split('_')[0].title()}Settings", 
+            "Settings"
+        ]
+        
+        for class_name in class_names:
+            if hasattr(module, class_name):
+                settings_class = getattr(module, class_name)
+                return settings_class()
+        
+        raise AttributeError(f"No suitable settings class found in {settings_name}.py")
+        
+    except ImportError as e:
+        raise ImportError(f"Settings file '{settings_name}.py' not found: {e}")
+
+
+def auto_configure_settings(preferred_settings: Optional[str] = None) -> BaseEkaSettings:
+    """
+    Auto-configure settings by trying to load preferred settings,
+    falling back to default if not available.
+    
+    Args:
+        preferred_settings: Name of preferred settings file (without .py)
+    
+    Returns:
+        Configured settings instance
+    """
+    if preferred_settings:
+        try:
+            settings_instance = load_settings_by_name(preferred_settings)
+            configure_settings(settings_instance)
+            return settings_instance
+        except (ImportError, AttributeError, ValidationError) as e:
+            print(f"Warning: Could not load {preferred_settings} settings: {e}")
+            print("Falling back to default settings")
+    
+    # Fallback to default settings
+    settings_instance = EkaSettings()
+    configure_settings(settings_instance)
+    return settings_instance
 
 
 # For backward compatibility - initialize with default settings

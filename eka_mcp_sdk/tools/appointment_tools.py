@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token, AccessToken
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -11,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
-    client = DoctorToolsClient()
-    appointment_service = AppointmentService(client)
     
     @mcp.tool(
         description="Get available appointment slots for a doctor at a specific clinic on a given date"
@@ -24,6 +23,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Returns available appointment slots with timing and pricing information."""
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, date)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -44,6 +46,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Returns booked appointment details with confirmation."""
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.book_appointment(appointment_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -84,6 +89,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Enriched appointments with patient names, doctor details, and clinic information
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointments_enriched(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
@@ -131,6 +139,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointments with entity IDs only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointments_basic(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
@@ -169,6 +180,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Complete appointment details with enriched patient, doctor, and clinic information
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -200,6 +214,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointment details with entity IDs only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -231,6 +248,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             List of enriched appointments for the patient with doctor and clinic information
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -262,6 +282,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Basic appointments with entity IDs only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -292,6 +315,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Updated appointment details
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -320,6 +346,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Completion confirmation with updated appointment status
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.complete_appointment(appointment_id, completion_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -348,6 +377,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Cancellation confirmation with updated appointment status
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -376,6 +408,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             Rescheduled appointment details with new timing
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
             result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:

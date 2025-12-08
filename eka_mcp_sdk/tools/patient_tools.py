@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token, AccessToken
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -11,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
-    client = DoctorToolsClient()
-    patient_service = PatientService(client)
     
     @mcp.tool(
         description="Search patient profiles by username, mobile, or full name using prefix matching"
@@ -24,6 +23,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Returns a list of patients matching the search criteria."""
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.search_patients(prefix, limit, select)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -44,6 +46,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Returns basic patient profile including personal and medical information only."""
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.get_patient_details_basic(patient_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -78,6 +83,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Complete patient profile with enriched appointment history including doctor and clinic details
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.get_comprehensive_patient_profile(
                 patient_id, include_appointments, appointment_limit
             )
@@ -104,6 +112,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Created patient profile with oid identifier
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.add_patient(patient_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -138,6 +149,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Paginated list of patient profiles
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.list_patients(page_no, page_size, select, from_timestamp, include_archived)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -166,6 +180,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Success message confirming profile update
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.update_patient(patient_id, update_data)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -194,6 +211,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Success message confirming profile archival
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.archive_patient(patient_id, archive)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -222,6 +242,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
             Patient profile(s) matching the mobile number
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            patient_service = PatientService(client)
             result = await patient_service.get_patient_by_mobile(mobile, full_profile)
             return {"success": True, "data": result}
         except EkaAPIError as e:

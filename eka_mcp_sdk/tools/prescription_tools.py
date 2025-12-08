@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 import logging
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token, AccessToken
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -11,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 def register_prescription_tools(mcp: FastMCP) -> None:
     """Register Prescription Management MCP tools."""
-    client = DoctorToolsClient()
-    prescription_service = PrescriptionService(client)
     
     @mcp.tool()
     async def get_prescription_details_basic(prescription_id: str) -> Dict[str, Any]:
@@ -29,6 +28,9 @@ def register_prescription_tools(mcp: FastMCP) -> None:
             Basic prescription details including medications and diagnosis only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            prescription_service = PrescriptionService(client)
             result = await prescription_service.get_prescription_details_basic(prescription_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -65,6 +67,9 @@ def register_prescription_tools(mcp: FastMCP) -> None:
             Complete prescription details with enriched patient, doctor, and clinic information
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            prescription_service = PrescriptionService(client)
             result = await prescription_service.get_comprehensive_prescription_details(
                 prescription_id, include_patient_details, include_doctor_details, include_clinic_details
             )

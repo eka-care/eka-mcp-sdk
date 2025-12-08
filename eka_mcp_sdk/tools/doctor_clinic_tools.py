@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token, AccessToken
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -11,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     """Register Doctor and Clinic Information MCP tools."""
-    client = DoctorToolsClient()
-    doctor_clinic_service = DoctorClinicService(client)
     
     @mcp.tool(
         description="Get clinic and doctor details for the business"
@@ -20,6 +19,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     async def get_business_entities() -> Dict[str, Any]:
         """Returns complete list of clinics and doctors associated with the business."""
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_business_entities()
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -47,6 +49,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Basic doctor profile including specialties, contact info, and background only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -74,6 +79,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Basic clinic details including address, facilities, and services only
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -98,6 +106,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             List of services and specialties offered by the doctor
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_services(doctor_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -132,6 +143,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Complete doctor profile with enriched clinic details, services, and appointment history
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_doctor_profile(
                 doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
             )
@@ -168,6 +182,9 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             Complete clinic profile with enriched doctor details, services, and appointment history
         """
         try:
+            token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_clinic_profile(
                 clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit
             )
