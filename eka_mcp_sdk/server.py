@@ -3,11 +3,10 @@ import logging
 from typing import Optional
 from fastmcp import FastMCP
 
-from .config.settings import settings
+from .config.settings import EkaSettings
 from .sdk import EkaMCPSDK
 from .tools.doctor_tools import register_doctor_tools
 
-logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +22,7 @@ def create_mcp_server() -> FastMCP:
             Answer practice related questions such as patient demographics, appointment history, prescription history, etc.
         """)
     
+    settings = EkaSettings()
     @mcp.tool()
     async def get_server_info() -> dict:
         """
@@ -49,7 +49,6 @@ def create_mcp_server() -> FastMCP:
 def main():
     """Main entry point for the MCP server."""
     logger.info("Starting Eka.care MCP Server...")
-    logger.info(f"API base URL: {settings.api_base_url}")
     
     mcp = create_mcp_server()
     mcp.run(transport="stdio")
