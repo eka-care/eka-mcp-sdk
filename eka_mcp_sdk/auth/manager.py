@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 import logging
 
-from ..config.settings import get_current_settings
+from ..config.settings import EkaSettings
 from .models import TokenResponse, AuthContext, EkaAPIError
 from .storage import FileTokenStorage
 
@@ -18,6 +18,7 @@ class AuthenticationManager:
         self._refresh_token: Optional[str] = None
         self._external_access_token = access_token
         self._http_client = httpx.AsyncClient(timeout=30.0)
+        self._settings = EkaSettings()
         
         # Only use storage when not using external access token
         self._storage = None if access_token else FileTokenStorage()
@@ -83,15 +84,14 @@ class AuthenticationManager:
     
     async def _obtain_access_token(self) -> None:
         """Obtain access token using client credentials."""
-        settings = get_current_settings()
-        if not settings.client_id or not settings.client_secret:
+        if not self._settings.client_id or not self._settings.client_secret:
             raise EkaAPIError("Client ID and Client Secret are required for authentication")
             
-        url = f"{settings.api_base_url}/connect-auth/v1/account/login"
+        url = f"{self._settings.api_base_url}/connect-auth/v1/account/login"
         payload = {
-            "client_id": settings.client_id,
-            "client_secret": settings.client_secret,
-            "api_key": settings.api_key
+            "client_id": self._settings.client_id,
+            "client_secret": self._settings.client_secret,
+            "api_key": self._settings.api_key
         }
         
         logger.info(f"Making login request to: {url}")
@@ -141,8 +141,7 @@ class AuthenticationManager:
     
     async def _refresh_access_token(self) -> None:
         """Refresh access token using refresh token."""
-        settings = get_current_settings()
-        url = f"{settings.api_base_url}/connect-auth/v1/account/refresh"
+        url = f"{self._settings.api_base_url}/connect-auth/v1/account/refresh"
         payload = {"refreshToken": self._refresh_token}
         
         logger.info(f"Making refresh token request to: {url}")

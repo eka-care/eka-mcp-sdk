@@ -36,7 +36,7 @@ from ..auth.models import TokenResponse, AuthContext, EkaAPIError
 from ..auth.manager import AuthenticationManager
 from ..clients.base import BaseEkaClient
 from ..clients.doctor_tools_client import DoctorToolsClient
-from ..config.settings import BaseEkaSettings, EkaSettings, configure_settings, get_current_settings, reset_settings
+from ..config.settings import EkaSettings
 
 # Import service classes
 from .patient_service import PatientService
@@ -52,11 +52,7 @@ __all__ = [
     "AuthenticationManager",
     "BaseEkaClient",
     "DoctorToolsClient",
-    "BaseEkaSettings",
     "EkaSettings",
-    "configure_settings",
-    "get_current_settings",
-    "reset_settings",
     # Service classes
     "PatientService",
     "AppointmentService",
