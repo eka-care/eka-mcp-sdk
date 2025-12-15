@@ -36,7 +36,7 @@ def create_mcp_server() -> FastMCP:
             "version": "0.1.0",
             "api_base_url": settings.api_base_url,
             "client_id": settings.client_id,
-            "available_modules": ["Doctor Tools"],
+            "available_modules": ["Doctor Tools", "Patient Tools", "Appointment Tools", "Assessment Tools"],
             "status": "running"
         }
     

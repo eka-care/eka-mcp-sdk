@@ -218,6 +218,35 @@ async def get_appointments_basic(...):
     """
 ```
 
+## **10. Simple Single-API Tool Pattern**
+
+For straightforward APIs that don't require enrichment, implement focused tools without the basic/enriched distinction:
+
+```python
+# Client extends BaseEkaClient
+class AssessmentClient(BaseEkaClient):
+    async def fetch_grouped_assessments(...) -> Dict[str, Any]:
+        # Build params and call _make_request
+        return await self._make_request("GET", endpoint, params=params)
+
+# Tool registration with flexible filtering
+@mcp.tool()
+async def fetch_grouped_assessments(
+    practitioner_uuid: Optional[str] = None,
+    patient_uuid: Optional[str] = None,
+    ...
+) -> Dict[str, Any]:
+    """Fetch grouped assessment conversations."""
+    client = AssessmentClient(access_token=...)
+    result = await client.fetch_grouped_assessments(...)
+    return {"success": True, "data": result}
+```
+
+### When to use:
+- API returns complete data (no enrichment needed)
+- Single, focused purpose
+- Optional parameters for filtering
+
 ## **Implementation Status**
 
 ✅ **Strategy 1**: Tool naming convention with `_enriched` and `_basic` suffixes
@@ -229,7 +258,8 @@ async def get_appointments_basic(...):
 ## **Recommended Implementation Order**
 
 1. ✅ **Complete naming convention** (partially done)
-2. **Apply to all tool categories** (patient, doctor, prescription tools)
-3. **Implement tool ordering** in registration
-4. **Add performance hints** to descriptions
-5. **Consider smart defaults** for future versions
+2. **Simple single-API tools** (Assessment Tools)
+3. **Apply to all tool categories** (patient, doctor, prescription tools)
+4. **Implement tool ordering** in registration
+5. **Add performance hints** to descriptions
+6. **Consider smart defaults** for future versions
