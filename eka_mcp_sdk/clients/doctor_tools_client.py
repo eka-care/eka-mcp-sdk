@@ -324,6 +324,37 @@ class DoctorToolsClient(BaseEkaClient):
             params=params if params else None
         )
     
+    # Assessment APIs
+    async def fetch_grouped_assessments(
+        self,
+        practitioner_uuid: Optional[str] = None,
+        patient_uuid: Optional[str] = None,
+        unique_identifier: Optional[str] = None,
+        transaction_id: Optional[str] = None,
+        wfids: Optional[List[str]] = None,
+        status: str = "COMPLETED"
+    ) -> Dict[str, Any]:
+        """Fetch grouped assessment conversations."""
+        params = {}
+        if practitioner_uuid:
+            params["practitioner_uuid"] = practitioner_uuid
+        if patient_uuid:
+            params["patient_uuid"] = patient_uuid
+        if unique_identifier:
+            params["unique_identifier"] = unique_identifier
+        if transaction_id:
+            params["transaction_id"] = transaction_id
+        if wfids:
+            params["wfids"] = ",".join(wfids)
+        if status:
+            params["status"] = status
+            
+        return await self._make_request(
+            method="GET",
+            endpoint="/assessment/api/fetch_interviews/v2/",
+            params=params if params else None
+        )
+    
     # Prescription APIs
     async def get_prescription_details(
         self,
