@@ -275,7 +275,7 @@ cat examples/MCP_USAGE.md
 | `EKA_API_BASE_URL` | Eka.care API base URL | `https://api.eka.care` |
 | `EKA_CLIENT_ID` | Client ID from Eka.care | Required |
 | `EKA_CLIENT_SECRET` | Client secret from Eka.care | Required |
-| `EKA_API_KEY` | Optional API key for additional auth | - |
+| `EKA_API_KEY` | API key for additional auth | Required|
 | `EKA_MCP_SERVER_HOST` | MCP server host | `localhost` |
 | `EKA_MCP_SERVER_PORT` | MCP server port | `8000` |
 | `EKA_LOG_LEVEL` | Logging level | `INFO` |

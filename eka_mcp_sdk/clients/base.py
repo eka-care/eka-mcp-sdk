@@ -2,6 +2,8 @@ import httpx
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 import logging
+from fastmcp.server.dependencies import get_context
+from fastmcp.server.context import Context
 
 from ..auth.manager import AuthenticationManager
 from ..auth.models import EkaAPIError
@@ -30,6 +32,14 @@ class BaseEkaClient(ABC):
         settings = EkaSettings()
         url = f"{settings.api_base_url}{endpoint}"
         
+        # Try to get FastMCP context for logging (may not be available in all contexts)
+        ctx: Optional[Context] = None
+        try:
+            ctx = get_context()
+        except RuntimeError:
+            # Context not available (e.g., outside of MCP request)
+            pass
+        
         try:
             # Get authentication context
             auth_context = await self._auth_manager.get_auth_context()
@@ -46,12 +56,15 @@ class BaseEkaClient(ABC):
             if self._custom_headers:
                 headers.update(self._custom_headers)
             
-            logger.info(f"Making {method} request to: {url}")
-            if params:
-                logger.debug(f"Request params: {params}")
-            if data:
-                logger.debug(f"Request data: {data}")
-            logger.debug(f"Request headers: {headers}")
+            # Log using context if available, fallback to standard logger
+            if ctx:
+                await ctx.debug(f"API Request: {method} {endpoint}")
+                if params:
+                    await ctx.debug(f"Request params: {params}")
+            else:
+                logger.info(f"Making {method} request to: {url}")
+                if params:
+                    logger.debug(f"Request params: {params}")
             
             # Make request
             response = await self._http_client.request(
@@ -62,12 +75,20 @@ class BaseEkaClient(ABC):
                 params=params
             )
             
-            logger.info(f"API response status: {response.status_code}")
-            logger.debug(f"API response headers: {dict(response.headers)}")
+            # Log response status
+            if ctx:
+                await ctx.debug(f"API Response: {response.status_code}")
+            else:
+                logger.info(f"API response status: {response.status_code}")
             
             # Handle response
             if response.status_code >= 400:
-                logger.error(f"API error response: {response.text}")
+                error_msg = f"API error: {response.status_code} - {response.text[:100]}"
+                if ctx:
+                    await ctx.error(error_msg)
+                else:
+                    logger.error(f"API error response: {response.text}")
+                
                 error_detail = await self._parse_error_response(response)
                 raise EkaAPIError(
                     message=error_detail["message"],
@@ -76,18 +97,29 @@ class BaseEkaClient(ABC):
                 )
             
             response_data = response.json()
-            logger.debug(f"API response data: {response_data}")
             
             return response_data
             
         except httpx.RequestError as e:
-            logger.error(f"Request error for {method} {url}: {str(e)}")
+            error_msg = f"Network error for {method} {url}: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            else:
+                logger.error(error_msg)
             raise EkaAPIError(f"Network error: {str(e)}")
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error for {method} {url}: {e.response.status_code} - {e.response.text}")
+            error_msg = f"HTTP error for {method} {url}: {e.response.status_code}"
+            if ctx:
+                await ctx.error(error_msg)
+            else:
+                logger.error(f"HTTP error for {method} {url}: {e.response.status_code} - {e.response.text}")
             raise EkaAPIError(f"HTTP error: {e.response.status_code}", e.response.status_code)
         except Exception as e:
-            logger.error(f"Unexpected error for {method} {url}: {str(e)}")
+            error_msg = f"Unexpected error for {method} {url}: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            else:
+                logger.error(error_msg)
             raise EkaAPIError(f"Unexpected error: {str(e)}")
     
     async def _parse_error_response(self, response: httpx.Response) -> Dict[str, Any]:

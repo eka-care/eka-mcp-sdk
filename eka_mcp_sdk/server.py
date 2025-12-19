@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Optional
 from fastmcp import FastMCP
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
 
 from .config.settings import EkaSettings
 from .sdk import EkaMCPSDK
@@ -23,14 +25,18 @@ def create_mcp_server() -> FastMCP:
         """)
     
     settings = EkaSettings()
+    
     @mcp.tool()
-    async def get_server_info() -> dict:
+    async def get_server_info(ctx: Context = CurrentContext()) -> dict:
         """
         Get server information and configuration.
         
         Returns:
             Server configuration and status information
         """
+        await ctx.info("Fetching server information")
+        await ctx.debug(f"API Base URL: {settings.api_base_url}")
+        
         return {
             "server_name": "Eka.care Healthcare API Server",
             "version": "0.1.0",
