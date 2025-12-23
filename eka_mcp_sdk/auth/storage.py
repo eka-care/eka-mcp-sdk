@@ -11,7 +11,8 @@ class FileTokenStorage:
     """File-based token storage implementation."""
     
     def __init__(self):
-        from ..config.settings import settings
+        from ..config.settings import EkaSettings
+        settings = EkaSettings()
         
         if settings.token_storage_dir:
             self.storage_dir = Path(settings.token_storage_dir)

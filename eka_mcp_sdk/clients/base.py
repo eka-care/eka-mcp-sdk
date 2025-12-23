@@ -12,6 +12,36 @@ from ..config.settings import EkaSettings
 logger = logging.getLogger(__name__)
 
 
+def _build_curl_command(method: str, url: str, headers: Dict[str, str], data: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None) -> str:
+    """Build a curl command from request parameters."""
+    import urllib.parse
+    
+    # Start with basic curl command
+    curl_parts = ['curl', '-X', method]
+    
+    # Add headers
+    for key, value in headers.items():
+        # Mask sensitive headers
+        # if key.lower() in ['authorization', 'client-secret']:
+        #     value = value[:20] + '...' if len(value) > 20 else '***'
+        curl_parts.append(f"-H '{key}: {value}'")
+    
+    # Add query parameters to URL
+    if params:
+        query_string = urllib.parse.urlencode(params)
+        url = f"{url}?{query_string}"
+    
+    # Add data if present
+    if data:
+        import json
+        curl_parts.append(f"-d '{json.dumps(data)}'")
+    
+    # Add URL
+    curl_parts.append(f"'{url}'")
+    
+    return ' '.join(curl_parts)
+
+
 class BaseEkaClient(ABC):
     """Base client for Eka.care API interactions."""
     
@@ -19,6 +49,7 @@ class BaseEkaClient(ABC):
         self._http_client = httpx.AsyncClient(timeout=30.0)
         self._auth_manager = AuthenticationManager(access_token)
         self._custom_headers = custom_headers or {}
+        self.last_curl_command: Optional[str] = None
     
     async def _make_request(
         self,
@@ -56,15 +87,21 @@ class BaseEkaClient(ABC):
             if self._custom_headers:
                 headers.update(self._custom_headers)
             
+            # Generate curl command for debugging
+            curl_cmd = _build_curl_command(method, url, headers, data, params)
+            self.last_curl_command = curl_cmd  # Store for test access
+            
             # Log using context if available, fallback to standard logger
             if ctx:
                 await ctx.debug(f"API Request: {method} {endpoint}")
                 if params:
                     await ctx.debug(f"Request params: {params}")
+                await ctx.debug(f"Curl command: {curl_cmd}")
             else:
                 logger.info(f"Making {method} request to: {url}")
                 if params:
                     logger.debug(f"Request params: {params}")
+                logger.debug(f"Curl command: {curl_cmd}")
             
             # Make request
             response = await self._http_client.request(
@@ -74,7 +111,7 @@ class BaseEkaClient(ABC):
                 json=data,
                 params=params
             )
-            
+
             # Log response status
             if ctx:
                 await ctx.debug(f"API Response: {response.status_code}")
