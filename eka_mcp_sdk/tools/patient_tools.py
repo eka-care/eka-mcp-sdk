@@ -2,6 +2,8 @@ from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -19,16 +21,25 @@ def register_patient_tools(mcp: FastMCP) -> None:
     async def search_patients(
         prefix: Annotated[str, "Search term to match against patient profiles (username, mobile, or full name)"],
         limit: Annotated[Optional[int], "Maximum number of results to return (default: 50, max: 50)"] = None,
-        select: Annotated[Optional[str], "Comma-separated list of additional fields to include"] = None
+        select: Annotated[Optional[str], "Comma-separated list of additional fields to include"] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns a list of patients matching the search criteria."""
+        await ctx.info(f"Searching patients with prefix: {prefix}")
+        await ctx.debug(f"Search parameters - limit: {limit}, select: {select}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.search_patients(prefix, limit, select)
+            
+            patient_count = len(result.get('patients', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"Found {patient_count} patients matching search criteria")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Patient search failed: {e.message} (status: {e.status_code})")
             return {
                 "success": False,
                 "error": {
@@ -65,7 +76,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
     async def get_comprehensive_patient_profile(
         patient_id: str,
         include_appointments: bool = True,
-        appointment_limit: Optional[int] = None
+        appointment_limit: Optional[int] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         🌟 RECOMMENDED: Get comprehensive patient profile including detailed appointment history with enriched doctor and clinic information.
@@ -82,6 +94,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Returns:
             Complete patient profile with enriched appointment history including doctor and clinic details
         """
+        await ctx.info(f"Fetching comprehensive profile for patient: {patient_id}")
+        await ctx.debug(f"Include appointments: {include_appointments}, limit: {appointment_limit}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -89,8 +104,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             result = await patient_service.get_comprehensive_patient_profile(
                 patient_id, include_appointments, appointment_limit
             )
+            
+            await ctx.info("Successfully retrieved comprehensive patient profile")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Failed to fetch patient profile: {e.message} (status: {e.status_code})")
             return {
                 "success": False,
                 "error": {
@@ -101,23 +120,31 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool()
-    async def add_patient(patient_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def add_patient(patient_data: Dict[str, Any], ctx: Context = CurrentContext()) -> Dict[str, Any]:
         """
         Create a new patient profile.
         
         Args:
-            patient_data: Patient information including name (fn/ln or fln), dob, gen, and optional fields like mobile, email, etc.
+            patient_data: Patient information including fln (name), dob, gen, and optional fields like mobile, email, etc.
         
         Returns:
             Created patient profile with oid identifier
         """
+        await ctx.info("Creating new patient profile")
+        await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.add_patient(patient_data)
+            
+            patient_id = result.get('oid') if isinstance(result, dict) else None
+            await ctx.info(f"Successfully created patient profile (ID: {patient_id})")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Failed to create patient: {e.message} (status: {e.status_code})")
             return {
                 "success": False,
                 "error": {

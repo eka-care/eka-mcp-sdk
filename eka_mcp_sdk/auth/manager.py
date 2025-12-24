@@ -6,6 +6,7 @@ import logging
 from ..config.settings import EkaSettings
 from .models import TokenResponse, AuthContext, EkaAPIError
 from .storage import FileTokenStorage
+from fastmcp.server.context import Context
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,11 @@ class AuthenticationManager:
         self._settings = EkaSettings()
         
         # Only use storage when not using external access token
+        ctx : Optional[Context] = None
+        if ctx:
+            ctx.debug(f"CTX AuthenticationManager initialized, access token : {access_token}")
+        else:   
+            logger.debug(f"Logger AuthenticationManager initialized, access token : {access_token}")
         self._storage = None if access_token else FileTokenStorage()
     
     async def get_auth_context(self) -> AuthContext:
@@ -142,7 +148,7 @@ class AuthenticationManager:
     async def _refresh_access_token(self) -> None:
         """Refresh access token using refresh token."""
         url = f"{self._settings.api_base_url}/connect-auth/v1/account/refresh"
-        payload = {"refreshToken": self._refresh_token}
+        payload = {"refresh_token": self._refresh_token}
         
         logger.info(f"Making refresh token request to: {url}")
         logger.debug(f"Refresh token payload: {payload}")
@@ -151,7 +157,7 @@ class AuthenticationManager:
             response = await self._http_client.post(
                 url,
                 json=payload,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {self._external_access_token}"}
             )
             
             logger.info(f"Refresh response status: {response.status_code}")
