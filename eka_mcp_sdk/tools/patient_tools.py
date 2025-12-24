@@ -125,7 +125,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Create a new patient profile.
         
         Args:
-            patient_data: Patient information including name (fn/ln or fln), dob, gen, and optional fields like mobile, email, etc.
+            patient_data: Patient information including fln (name), dob, gen, and optional fields like mobile, email, etc.
         
         Returns:
             Created patient profile with oid identifier

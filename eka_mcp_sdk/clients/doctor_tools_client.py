@@ -165,13 +165,14 @@ class DoctorToolsClient(BaseEkaClient):
         self,
         doctor_id: str,
         clinic_id: str,
-        date: str
+        start_date: str,
+        end_date: str
     ) -> Dict[str, Any]:
-        """Get Appointment Slots for a doctor at a clinic on a specific date."""
+        """Get Appointment Slots for a doctor at a clinic within a date range (D to D+1 only)."""
         return await self._make_request(
             method="GET",
             endpoint=f"/dr/v1/doctor/{doctor_id}/clinic/{clinic_id}/appointment/slot",
-            params={"date": date}
+            params={"start_date": start_date, "end_date": end_date}
         )
     
     # Appointment Management APIs
@@ -236,14 +237,17 @@ class DoctorToolsClient(BaseEkaClient):
         update_data: Dict[str, Any],
         partner_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Update Appointment."""
+        """Update Appointment using V2 API.
+        
+        Note: V2 API requires doctor_id, clinic_id, and patient_id in the request body.
+        """
         params = {}
         if partner_id:
             params["partner_id"] = partner_id
             
         return await self._make_request(
             method="PATCH",
-            endpoint=f"/dr/v1/appointment/{appointment_id}",
+            endpoint=f"/dr/v2/appointment/{appointment_id}",
             data=update_data,
             params=params if params else None
         )
@@ -311,18 +315,52 @@ class DoctorToolsClient(BaseEkaClient):
     async def get_patient_appointments(
         self,
         patient_id: str,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get all appointments for a patient profile."""
-        params = {}
-        if limit:
-            params["limit"] = limit
+        """Get all appointments for a patient profile using the appointments endpoint.
+        
+        Note: If patient_id is provided, no other filters (dates, doctor_id, clinic_id) are allowed.
+        """
+        # Note: API constraint - patient_id cannot be combined with date filters
+        params = {"patient_id": patient_id, "page_no": 0}
             
-        return await self._make_request(
+        # Get appointments using the standard endpoint
+        result = await self._make_request(
             method="GET",
-            endpoint=f"/dr/v1/appointment/patient/{patient_id}",
-            params=params if params else None
+            endpoint="/dr/v1/appointment",
+            params=params
         )
+        
+        # Filter by dates client-side if needed, and apply limit
+        if isinstance(result, dict):
+            appointments = result.get("appointments", [])
+            
+            # Apply date filtering client-side if dates provided
+            if start_date or end_date:
+                from datetime import datetime
+                filtered = []
+                for appt in appointments:
+                    appt_time = appt.get("start_time", 0)
+                    if start_date:
+                        start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp())
+                        if appt_time < start_ts:
+                            continue
+                    if end_date:
+                        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp()) + 86400  # end of day
+                        if appt_time > end_ts:
+                            continue
+                    filtered.append(appt)
+                appointments = filtered
+            
+            # Apply limit
+            if limit and len(appointments) > limit:
+                appointments = appointments[:limit]
+            
+            result["appointments"] = appointments
+        
+        return result
     
     # Assessment APIs
     async def fetch_grouped_assessments(

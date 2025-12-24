@@ -35,15 +35,19 @@ class AppointmentService:
         self,
         doctor_id: str,
         clinic_id: str,
-        date: str
+        start_date: str,
+        end_date: str
     ) -> Dict[str, Any]:
         """
-        Get available appointment slots for a doctor at a specific clinic on a given date.
+        Get available appointment slots for a doctor at a specific clinic within a date range.
+        
+        Note: API only supports date range of D to D+1.
         
         Args:
             doctor_id: Doctor's unique identifier
             clinic_id: Clinic's unique identifier
-            date: Date for appointment slots (YYYY-MM-DD format)
+            start_date: Start date for appointment slots (YYYY-MM-DD format)
+            end_date: End date for appointment slots (YYYY-MM-DD format, must be start_date + 1 day)
             
         Returns:
             Available appointment slots with timing and pricing information
@@ -51,7 +55,7 @@ class AppointmentService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_appointment_slots(doctor_id, clinic_id, date)
+        return await self.client.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
     
     async def book_appointment(self, appointment_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -200,7 +204,9 @@ class AppointmentService:
     async def get_patient_appointments_enriched(
         self,
         patient_id: str,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get all appointments for a specific patient with enriched doctor and clinic details.
@@ -210,6 +216,8 @@ class AppointmentService:
         Args:
             patient_id: Patient's unique identifier
             limit: Maximum number of appointments to return
+            start_date: Start date filter (YYYY-MM-DD format, optional)
+            end_date: End date filter (YYYY-MM-DD format, optional)
             
         Returns:
             List of enriched appointments for the patient with doctor and clinic information
@@ -218,7 +226,7 @@ class AppointmentService:
             EkaAPIError: If the API call fails
         """
         # Get basic appointments
-        appointments_result = await self.client.get_patient_appointments(patient_id, limit)
+        appointments_result = await self.client.get_patient_appointments(patient_id, limit, start_date, end_date)
         
         # Enrich with additional details
         enriched_result = await self._enrich_appointments_data(appointments_result)
@@ -228,7 +236,9 @@ class AppointmentService:
     async def get_patient_appointments_basic(
         self,
         patient_id: str,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get basic appointments for a specific patient (IDs only).
@@ -236,6 +246,8 @@ class AppointmentService:
         Args:
             patient_id: Patient's unique identifier
             limit: Maximum number of appointments to return
+            start_date: Start date filter (YYYY-MM-DD format, optional)
+            end_date: End date filter (YYYY-MM-DD format, optional)
             
         Returns:
             Basic appointments with entity IDs only
@@ -243,7 +255,7 @@ class AppointmentService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_patient_appointments(patient_id, limit)
+        return await self.client.get_patient_appointments(patient_id, limit, start_date, end_date)
     
     async def update_appointment(
         self,

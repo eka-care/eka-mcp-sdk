@@ -133,7 +133,17 @@ class BaseEkaClient(ABC):
                     error_code=error_detail.get("error_code")
                 )
             
-            response_data = response.json()
+            # Handle 204 No Content or empty responses
+            if response.status_code == 204 or not response.text:
+                return {"success": True, "status_code": response.status_code}
+            
+            try:
+                response_data = response.json()
+            except Exception:
+                # If JSON parsing fails but status is successful, return success
+                if 200 <= response.status_code < 300:
+                    return {"success": True, "status_code": response.status_code, "raw_response": response.text}
+                raise
             
             return response_data
             
