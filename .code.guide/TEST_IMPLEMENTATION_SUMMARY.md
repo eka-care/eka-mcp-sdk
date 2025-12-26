@@ -278,7 +278,7 @@ $ ./run_tests.py all --test-write
 
 ## 🔗 Related Files
 
-- `eka_mcp_sdk/core/patient_service.py` - Service layer being tested
+- `eka_mcp_sdk/services/patient_service.py` - Service layer being tested
 - `eka_mcp_sdk/clients/doctor_tools_client.py` - HTTP client
 - `eka_mcp_sdk/tools/patient_tools.py` - MCP tool definitions
 - `.env` - Configuration (API credentials)

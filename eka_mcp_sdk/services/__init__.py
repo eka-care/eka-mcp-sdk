@@ -1,5 +1,5 @@
 """
-Core module that provides both foundational components and service classes.
+Services module that provides both foundational components and service classes.
 
 This module provides:
 1. Foundational components for hosted MCP implementations
@@ -7,18 +7,15 @@ This module provides:
 
 Example usage for building a remote MCP server:
 
-    from eka_mcp_sdk.core import (
-        BaseEkaClient,
-        AuthenticationManager, 
-        AuthContext,
-        EkaAPIError,
-        DoctorToolsClient,
-        EkaSettings
-    )
+    from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
+    from eka_mcp_sdk.auth.manager import AuthenticationManager
+    from eka_mcp_sdk.clients.base_client import BaseEkaClient
+    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    from eka_mcp_sdk.config.settings import EkaSettings
 
 Example usage for direct service access:
 
-    from eka_mcp_sdk.core import (
+    from eka_mcp_sdk.services import (
         PatientService,
         AppointmentService,
         PrescriptionService,
@@ -34,7 +31,7 @@ Example usage for direct service access:
 
 from ..auth.models import TokenResponse, AuthContext, EkaAPIError
 from ..auth.manager import AuthenticationManager
-from ..clients.base import BaseEkaClient
+from ..clients.base_client import BaseEkaClient
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..config.settings import EkaSettings
 

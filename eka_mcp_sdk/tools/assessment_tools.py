@@ -5,7 +5,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
-from ..core.assessment_service import AssessmentService
+from ..services.assessment_service import AssessmentService
 
 logger = logging.getLogger(__name__)
 

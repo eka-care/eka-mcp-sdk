@@ -288,7 +288,7 @@ Total: 7 | Passed: 4 | Failed: 0 | Skipped: 3
 
 - Tests require valid OAuth credentials
 - Some APIs may not be available in all environments
-- Check LOGGING.md for log file locations
+- Check [../.code.guide/LOGGING.md](../.code.guide/LOGGING.md) for log file locations
 - Use `--verbose` for debugging API issues
 
 ## 🐛 Troubleshooting

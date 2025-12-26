@@ -2,6 +2,14 @@
 
 A simple, self-hosted Model Context Protocol (MCP) server that exposes Eka.care's healthcare APIs to LLM applications like Claude Desktop. This enables seamless integration of healthcare data and services into AI-powered workflows.
 
+## 📚 Documentation
+
+- **[Developer Guides](.code.guide/README.md)** - Comprehensive guides for developers
+  - Architecture & Setup ([CLAUDE.md](.code.guide/CLAUDE.md))
+  - Logging Guide ([LOGGING.md](.code.guide/LOGGING.md))
+  - Testing Guide ([TESTING_GUIDE.md](.code.guide/TESTING_GUIDE.md))
+  - Tool Selection Guide ([TOOL_SELECTION_GUIDE.md](.code.guide/TOOL_SELECTION_GUIDE.md))
+
 ## Features
 
 - **Self-Hosted Deployment**: Clean, simple deployment for healthcare organizations
@@ -156,14 +164,20 @@ get_patient_records(
 
 ## Building Hosted Solutions
 
-This SDK is designed to be modular and reusable. You can import core components to build more complex hosted MCP solutions:
+This SDK is designed to be modular and reusable. You can import components from their respective modules to build more complex hosted MCP solutions:
 
 ```python
-from eka_mcp_sdk.core import (
-    BaseEkaClient,
-    DoctorToolsClient, 
-    AuthContext,
-    EkaAPIError
+# Import foundational components from their original modules
+from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
+from eka_mcp_sdk.clients.base_client import BaseEkaClient
+from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+
+# Import service classes for business logic
+from eka_mcp_sdk.services import (
+    PatientService,
+    AppointmentService,
+    PrescriptionService,
+    DoctorClinicService
 )
 
 # Use these components in your hosted MCP implementation
