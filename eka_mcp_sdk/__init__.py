@@ -14,7 +14,7 @@ MCP Server (Traditional):
     eka-mcp-server
     
 Direct Library (Async):
-    from eka_mcp_sdk.core import PatientService, AppointmentService
+    from eka_mcp_sdk.services import PatientService, AppointmentService
     from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
     
     client = DoctorToolsClient()
@@ -28,11 +28,12 @@ CrewAI/Sync Integration:
     patients = search_patients_sync("john", limit=10)
     appointments = get_appointments_enriched_sync()
 
-For building remote MCP servers, import from eka_mcp_sdk.core:
-    from eka_mcp_sdk.core import (
-        BaseEkaClient, AuthenticationManager, AuthContext,
-        EkaAPIError, DoctorToolsClient, EkaSettings
-    )
+For building remote MCP servers, import from their respective modules:
+    from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
+    from eka_mcp_sdk.auth.manager import AuthenticationManager
+    from eka_mcp_sdk.clients.base_client import BaseEkaClient
+    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    from eka_mcp_sdk.config.settings import EkaSettings
 """
 
 __version__ = "0.1.0"
@@ -49,7 +50,7 @@ from .auth.models import AuthContext, EkaAPIError
 # - DoctorToolsClient from eka_mcp_sdk.clients.doctor_tools_client
 # - create_mcp_server, main from eka_mcp_sdk.server
 # - EkaMCPSDK from eka_mcp_sdk.sdk
-# - Service classes from eka_mcp_sdk.core
+# - Service classes from eka_mcp_sdk.services
 # - Sync functions from eka_mcp_sdk.lib
 
 __all__ = [
