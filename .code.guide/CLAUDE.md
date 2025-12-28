@@ -26,16 +26,22 @@ eka_mcp_sdk/
 │   └── models.py           # Pydantic models for auth (TokenResponse, AuthContext, EkaAPIError)
 ├── clients/                 # API client modules
 │   ├── __init__.py
-│   ├── base.py             # Base client class with common HTTP functionality
+│   ├── base_client.py      # Base client class with common HTTP functionality
 │   └── doctor_tools_client.py  # Doctor Tools API client
 ├── config/                  # Configuration management
 │   ├── __init__.py
 │   └── settings.py         # Pydantic settings with environment variable loading
-├── core/                    # Reusable core components for hosted solutions
-│   └── __init__.py         # Exports for external use
+├── services/                # Service layer - reusable business logic components
+│   ├── __init__.py         # Exports for external use
+│   ├── appointment_service.py   # Appointment business logic
+│   ├── patient_service.py       # Patient business logic
+│   ├── prescription_service.py  # Prescription business logic
+│   └── doctor_clinic_service.py # Doctor/Clinic business logic
 ├── tools/                   # MCP tool implementations
 │   ├── __init__.py
-│   └── doctor_tools.py     # FastMCP tools for Doctor Tools API
+│   ├── appointment_tools.py  # FastMCP tools for appointments
+│   ├── patient_tools.py      # FastMCP tools for patients
+│   └── doctor_clinic_tools.py # FastMCP tools for doctors/clinics
 ├── utils/                   # Utility functions
 │   └── __init__.py
 └── server.py               # Main MCP server entry point
@@ -57,9 +63,21 @@ eka_mcp_sdk/
 - **EkaSettings**: Pydantic settings class that loads from environment variables
 - Supports `.env` file loading with `EKA_` prefix
 
+#### Services Layer (`services/`)
+- **AppointmentService**: Business logic for appointment operations with enrichment
+- **PatientService**: Business logic for patient operations with enrichment
+- **PrescriptionService**: Business logic for prescription operations
+- **DoctorClinicService**: Business logic for doctor and clinic operations with enrichment
+- **AssessmentService**: Business logic for assessment operations
+- Pure Python classes that use clients to call APIs and add business logic
+- Can be used directly without FastMCP for library usage
+
 #### MCP Tools (`tools/`)
-- **register_doctor_tools()**: Registers Doctor Tools API endpoints as MCP tools
-- Each tool wraps API client methods with proper error handling
+- **register_appointment_tools()**: Registers appointment endpoints as MCP tools
+- **register_patient_tools()**: Registers patient endpoints as MCP tools  
+- **register_doctor_clinic_tools()**: Registers doctor/clinic endpoints as MCP tools
+- **register_prescription_tools()**: Registers prescription endpoints as MCP tools
+- Each tool wraps service methods with FastMCP context for logging
 
 ## Current API Modules
 
@@ -147,12 +165,19 @@ Set `LOG_LEVEL=DEBUG` for full debugging information.
 
 ### As Library for Hosted Solutions
 ```python
-from eka_mcp_sdk.core import (
-    BaseEkaClient,
-    DoctorToolsClient,
-    AuthContext,
-    EkaAPIError
+# Import foundational components from their original modules
+from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
+from eka_mcp_sdk.clients.base_client import BaseEkaClient
+from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+
+# Import service classes for business logic
+from eka_mcp_sdk.services import (
+    PatientService,
+    AppointmentService,
+    PrescriptionService,
+    DoctorClinicService
 )
+
 # Use components in hosted MCP implementation
 ```
 

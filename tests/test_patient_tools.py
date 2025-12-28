@@ -40,7 +40,7 @@ from typing import Any, Dict, Optional
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
-from eka_mcp_sdk.core.patient_service import PatientService
+from eka_mcp_sdk.services.patient_service import PatientService
 from eka_mcp_sdk.auth.models import EkaAPIError
 from eka_mcp_sdk.config.settings import EkaSettings
 

@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, List
 import logging
 
-from .base import BaseEkaClient
+from .base_client import BaseEkaClient
 
 logger = logging.getLogger(__name__)
 

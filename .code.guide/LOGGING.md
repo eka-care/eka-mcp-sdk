@@ -165,7 +165,7 @@ async def _make_request(self, method: str, endpoint: str) -> dict:
    - `get_comprehensive_patient_profile`: Patient ID, fetch status
    - `add_patient`: Creation entry, patient ID, errors
 
-3. **clients/base.py**
+3. **clients/base_client.py**
    - API request details (debug level)
    - Response status codes (debug level)
    - API errors (error level)

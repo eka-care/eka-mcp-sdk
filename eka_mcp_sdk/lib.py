@@ -27,7 +27,7 @@ from functools import wraps
 import logging
 
 from .clients.doctor_tools_client import DoctorToolsClient
-from .core import (
+from .services import (
     PatientService, 
     AppointmentService, 
     PrescriptionService, 
