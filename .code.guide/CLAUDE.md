@@ -27,7 +27,7 @@ eka_mcp_sdk/
 ├── clients/                 # API client modules
 │   ├── __init__.py
 │   ├── base_client.py      # Base client class with common HTTP functionality
-│   └── doctor_tools_client.py  # Doctor Tools API client
+│   └── eka_emr_client.py  # Doctor Tools API client
 ├── config/                  # Configuration management
 │   ├── __init__.py
 │   └── settings.py         # Pydantic settings with environment variable loading
@@ -57,7 +57,7 @@ eka_mcp_sdk/
 
 #### API Clients (`clients/`)
 - **BaseEkaClient**: Abstract base class with common HTTP request functionality
-- **DoctorToolsClient**: Specific implementation for Doctor Tools API endpoints
+- **EkaEMRClient**: Specific implementation for Doctor Tools API endpoints
 
 #### Configuration (`config/`)
 - **EkaSettings**: Pydantic settings class that loads from environment variables
@@ -168,7 +168,7 @@ Set `LOG_LEVEL=DEBUG` for full debugging information.
 # Import foundational components from their original modules
 from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
 from eka_mcp_sdk.clients.base_client import BaseEkaClient
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 
 # Import service classes for business logic
 from eka_mcp_sdk.services import (

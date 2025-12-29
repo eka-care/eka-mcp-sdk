@@ -7,7 +7,7 @@ from fastmcp.server.context import Context
 
 from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.doctor_clinic_service import DoctorClinicService
 
@@ -28,7 +28,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_business_entities()
             
@@ -69,7 +69,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
             
@@ -108,7 +108,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
             
@@ -144,7 +144,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_services(doctor_id)
             
@@ -189,7 +189,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_doctor_profile(
                 doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
@@ -235,7 +235,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_clinic_profile(
                 clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit
@@ -258,7 +258,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
 
 # These functions are now handled by the DoctorClinicService class
 # Keeping for backward compatibility if needed
-async def _enrich_doctor_clinics(client: DoctorToolsClient, doctor_id: str, business_entities: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def _enrich_doctor_clinics(client: EkaEMRClient, doctor_id: str, business_entities: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Enrich doctor profile with associated clinic details."""
     try:
         clinics = []
@@ -287,7 +287,7 @@ async def _enrich_doctor_clinics(client: DoctorToolsClient, doctor_id: str, busi
         return []
 
 
-async def _enrich_clinic_doctors(client: DoctorToolsClient, clinic_id: str, business_entities: Dict[str, Any], include_services: bool = True) -> Dict[str, List[Any]]:
+async def _enrich_clinic_doctors(client: EkaEMRClient, clinic_id: str, business_entities: Dict[str, Any], include_services: bool = True) -> Dict[str, List[Any]]:
     """Enrich clinic profile with associated doctor details and services."""
     try:
         doctors = []
@@ -329,7 +329,7 @@ async def _enrich_clinic_doctors(client: DoctorToolsClient, clinic_id: str, busi
         return {"doctors": [], "services": []}
 
 
-async def _enrich_doctor_appointments(client: DoctorToolsClient, appointments_data: Dict[str, Any], limit: Optional[int] = None) -> List[Dict[str, Any]]:
+async def _enrich_doctor_appointments(client: EkaEMRClient, appointments_data: Dict[str, Any], limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """Enrich doctor's recent appointments with patient details."""
     try:
         appointments_list = []
@@ -364,7 +364,7 @@ async def _enrich_doctor_appointments(client: DoctorToolsClient, appointments_da
         return []
 
 
-async def _enrich_clinic_appointments(client: DoctorToolsClient, appointments_data: Dict[str, Any], limit: Optional[int] = None) -> List[Dict[str, Any]]:
+async def _enrich_clinic_appointments(client: EkaEMRClient, appointments_data: Dict[str, Any], limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """Enrich clinic's recent appointments with patient and doctor details."""
     try:
         appointments_list = []

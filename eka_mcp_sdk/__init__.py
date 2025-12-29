@@ -15,9 +15,9 @@ MCP Server (Traditional):
     
 Direct Library (Async):
     from eka_mcp_sdk.services import PatientService, AppointmentService
-    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
     
-    client = DoctorToolsClient()
+    client = EkaEMRClient()
     patient_service = PatientService(client)
     result = await patient_service.search_patients("john")
 
@@ -32,7 +32,7 @@ For building remote MCP servers, import from their respective modules:
     from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
     from eka_mcp_sdk.auth.manager import AuthenticationManager
     from eka_mcp_sdk.clients.base_client import BaseEkaClient
-    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
     from eka_mcp_sdk.config.settings import EkaSettings
 """
 
@@ -47,7 +47,7 @@ from .auth.models import AuthContext, EkaAPIError
 # Note: The following are available via direct import from their modules:
 # - EkaSettings from eka_mcp_sdk.config.settings  
 # - AuthenticationManager from eka_mcp_sdk.auth.manager
-# - DoctorToolsClient from eka_mcp_sdk.clients.doctor_tools_client
+# - EkaEMRClient from eka_mcp_sdk.clients.eka_emr_client
 # - create_mcp_server, main from eka_mcp_sdk.server
 # - EkaMCPSDK from eka_mcp_sdk.sdk
 # - Service classes from eka_mcp_sdk.services

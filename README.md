@@ -170,7 +170,7 @@ This SDK is designed to be modular and reusable. You can import components from 
 # Import foundational components from their original modules
 from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
 from eka_mcp_sdk.clients.base_client import BaseEkaClient
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 
 # Import service classes for business logic
 from eka_mcp_sdk.services import (

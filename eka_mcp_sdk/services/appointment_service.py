@@ -7,7 +7,7 @@ and directly by other applications like CrewAI agents.
 from typing import Any, Dict, Optional, List
 import logging
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
     get_cached_data, 
@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 class AppointmentService:
     """Core service for appointment management operations."""
     
-    def __init__(self, client: DoctorToolsClient):
+    def __init__(self, client: EkaEMRClient):
         """
         Initialize the appointment service.
         
         Args:
-            client: DoctorToolsClient instance for API calls
+            client: EkaEMRClient instance for API calls
         """
         self.client = client
     

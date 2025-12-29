@@ -5,7 +5,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.assessment_service import AssessmentService
 
@@ -35,7 +35,7 @@ def register_assessment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             
             assessment_service = AssessmentService(client)
             

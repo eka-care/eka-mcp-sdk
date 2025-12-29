@@ -42,9 +42,9 @@ Lower layers have NO FastMCP dependencies, making them usable as a standard Pyth
 ```python
 # Can be used anywhere - no FastMCP requirement
 from eka_mcp_sdk.services import PatientService
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 
-client = DoctorToolsClient(access_token="...")
+client = EkaEMRClient(access_token="...")
 service = PatientService(client)
 result = await service.search_patients("john")  # ✅ Works without FastMCP!
 ```
@@ -494,7 +494,7 @@ grep -r "from fastmcp" eka_mcp_sdk/tools/
 ```python
 # This should work without FastMCP installed
 from eka_mcp_sdk.services import PatientService
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 ```
 
 ### Check 3: Tools Use Context

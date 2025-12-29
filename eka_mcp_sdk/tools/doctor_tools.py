@@ -2,7 +2,7 @@ from typing import Any, Dict
 import logging
 from fastmcp import FastMCP
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 
 # Import tool registration functions from modular files

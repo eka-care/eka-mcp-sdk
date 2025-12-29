@@ -12,7 +12,7 @@ from ..utils.enrichment_helpers import (
     get_appointment_status_info
 )
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.patient_service import PatientService
 
@@ -37,7 +37,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.search_patients(prefix, limit, select)
             
@@ -68,7 +68,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.get_patient_details_basic(patient_id)
             
@@ -113,7 +113,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.get_comprehensive_patient_profile(
                 patient_id, include_appointments, appointment_limit
@@ -149,7 +149,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.add_patient(patient_data)
             
@@ -194,7 +194,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.list_patients(page_no, page_size, select, from_timestamp, include_archived)
             
@@ -233,7 +233,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.update_patient(patient_id, update_data)
             
@@ -268,7 +268,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.archive_patient(patient_id, archive)
             return {"success": True, "data": result}
@@ -299,7 +299,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         try:
             token: AccessToken | None = get_access_token()
-            client = DoctorToolsClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.get_patient_by_mobile(mobile, full_profile)
             return {"success": True, "data": result}
@@ -316,12 +316,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
 
 # This function is now handled by the PatientService class
 # Keeping for backward compatibility if needed
-async def _enrich_patient_appointments(client: DoctorToolsClient, appointments_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def _enrich_patient_appointments(client: EkaEMRClient, appointments_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Enrich patient appointments with doctor and clinic details.
     
     Args:
-        client: DoctorToolsClient instance
+        client: EkaEMRClient instance
         appointments_data: Raw appointments data from API
     
     Returns:

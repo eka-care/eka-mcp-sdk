@@ -2,7 +2,7 @@
 from typing import Any, Dict, Optional, List
 import logging
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 
 logger = logging.getLogger(__name__)
@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 class AssessmentService:
     """Core service for assessment operations."""
     
-    def __init__(self, client: DoctorToolsClient):
+    def __init__(self, client: EkaEMRClient):
         """
         Initialize the assessment service.
         
         Args:
-            client: DoctorToolsClient instance for API calls
+            client: EkaEMRClient instance for API calls
         """
         self.client = client
     
