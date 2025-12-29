@@ -6,7 +6,7 @@ from .base_client import BaseEkaClient
 logger = logging.getLogger(__name__)
 
 
-class DoctorToolsClient(BaseEkaClient):
+class EkaEMRClient(BaseEkaClient):
     """Client for Doctor Tool Integration APIs based on official OpenAPI spec."""
     
     def get_api_module_name(self) -> str:

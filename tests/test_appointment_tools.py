@@ -42,7 +42,7 @@ from typing import Any, Dict, Optional
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.services.appointment_service import AppointmentService
 from eka_mcp_sdk.auth.models import EkaAPIError
 from eka_mcp_sdk.config.settings import EkaSettings
@@ -54,7 +54,7 @@ class TestRunner:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.settings = EkaSettings()
-        self.client: Optional[DoctorToolsClient] = None
+        self.client: Optional[EkaEMRClient] = None
         self.service: Optional[AppointmentService] = None
         self.test_appointment_id: Optional[str] = None
         self.test_doctor_id: Optional[str] = None
@@ -68,7 +68,7 @@ class TestRunner:
         print("=" * 70)
         
         # Initialize client (will handle OAuth flow)
-        self.client = DoctorToolsClient()
+        self.client = EkaEMRClient()
         self.service = AppointmentService(self.client)
         
         print(f"✅ API Base URL: {self.settings.api_base_url}")

@@ -6,9 +6,9 @@ for use with frameworks like CrewAI that don't support async operations.
 
 Example usage (Direct async):
     from eka_mcp_sdk.lib import PatientService, AppointmentService
-    from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+    from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
     
-    client = DoctorToolsClient()
+    client = EkaEMRClient()
     patient_service = PatientService(client)
     
     # Use async methods directly
@@ -26,7 +26,7 @@ from typing import Any, Dict, Optional, List
 from functools import wraps
 import logging
 
-from .clients.doctor_tools_client import DoctorToolsClient
+from .clients.eka_emr_client import EkaEMRClient
 from .services import (
     PatientService, 
     AppointmentService, 
@@ -40,11 +40,11 @@ logger = logging.getLogger(__name__)
 # Global client instance for sync functions
 _default_client = None
 
-def get_default_client() -> DoctorToolsClient:
+def get_default_client() -> EkaEMRClient:
     """Get or create default client instance."""
     global _default_client
     if _default_client is None:
-        _default_client = DoctorToolsClient()
+        _default_client = EkaEMRClient()
     return _default_client
 
 def sync_wrapper(func):

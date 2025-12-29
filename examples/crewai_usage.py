@@ -29,7 +29,7 @@ except ImportError:
     print("❌ CrewAI not installed. Please install it with: pip install crewai")
     exit(1)
 
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.auth.models import EkaAPIError
 from eka_mcp_sdk.config.settings import settings
 
@@ -43,7 +43,7 @@ class EkaCareBaseTool(BaseTool):
     
     def __init__(self):
         super().__init__()
-        self.client = DoctorToolsClient()
+        self.client = EkaEMRClient()
     
     async def _execute_async(self, *args, **kwargs) -> Dict[str, Any]:
         """Execute the async operation. To be implemented by subclasses."""

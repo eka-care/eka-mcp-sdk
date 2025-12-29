@@ -7,7 +7,7 @@ import logging
 
 from .config.settings import EkaSettings
 from .auth.manager import AuthenticationManager
-from .clients.doctor_tools_client import DoctorToolsClient
+from .clients.eka_emr_client import EkaEMRClient
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +55,14 @@ class EkaMCPSDK:
             self._auth_manager = AuthenticationManager()
         
         # Initialize clients
-        self._doctor_tools_client = None
+        self._eka_emr_client = None
     
     @property 
-    def doctor_tools(self) -> DoctorToolsClient:
+    def doctor_tools(self) -> EkaEMRClient:
         """Get Doctor Tools client instance."""
-        if self._doctor_tools_client is None:
-            self._doctor_tools_client = DoctorToolsClient(auth_manager_instance=self._auth_manager)
-        return self._doctor_tools_client
+        if self._eka_emr_client is None:
+            self._eka_emr_client = EkaEMRClient(auth_manager_instance=self._auth_manager)
+        return self._eka_emr_client
     
     async def get_auth_context(self):
         """Get current authentication context."""
@@ -70,6 +70,6 @@ class EkaMCPSDK:
     
     async def close(self):
         """Close all client connections."""
-        if self._doctor_tools_client:
-            await self._doctor_tools_client.close()
+        if self._eka_emr_client:
+            await self._eka_emr_client.close()
         await self._auth_manager.close()

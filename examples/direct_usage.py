@@ -17,7 +17,7 @@ import json
 from typing import Dict, Any
 import logging
 
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.auth.models import EkaAPIError
 from eka_mcp_sdk.config.settings import settings
 
@@ -60,7 +60,7 @@ async def demo_client_credentials_auth():
     
     try:
         # Create client without external token - uses client credentials
-        client = DoctorToolsClient()
+        client = EkaEMRClient()
         
         # Test basic patient search
         result = await client.search_patients(
@@ -97,7 +97,7 @@ async def demo_external_token_auth():
     
     try:
         # Create client with external token - no storage used
-        client = DoctorToolsClient(access_token=external_token)
+        client = EkaEMRClient(access_token=external_token)
         
         print(f"📝 Using external token: {external_token[:20]}...")
         print(f"📁 File storage disabled: {client._auth_manager._storage is None}")
@@ -119,7 +119,7 @@ async def demo_patient_operations():
     print("\n👥 PATIENT OPERATIONS")
     
     try:
-        client = DoctorToolsClient()
+        client = EkaEMRClient()
         
         # Search patients by name prefix
         result = await client.search_patients(prefix="Test", limit=3)
@@ -147,7 +147,7 @@ async def demo_appointment_operations():
     print("\n📅 APPOINTMENT OPERATIONS")
     
     try:
-        client = DoctorToolsClient()
+        client = EkaEMRClient()
         
         # Get business entities first to find doctor and clinic IDs
         entities_result = await client.get_business_entities()

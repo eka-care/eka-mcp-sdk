@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 import logging
 from fastmcp import FastMCP
 
-from ..clients.doctor_tools_client import DoctorToolsClient
+from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 
 logger = logging.getLogger(__name__)
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Appointment Management MCP tools."""
-    client = DoctorToolsClient()
+    client = EkaEMRClient()
     
     @mcp.tool()
     async def get_appointment_slots(

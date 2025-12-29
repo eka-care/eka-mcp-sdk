@@ -13,7 +13,7 @@ Setup:
 
 import asyncio
 import logging
-from eka_mcp_sdk.clients.doctor_tools_client import DoctorToolsClient
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.config.settings import settings
 
 # Configure logging to see headers in debug mode
@@ -25,7 +25,7 @@ async def demo_without_custom_headers():
     print("\n📡 API Call WITHOUT Custom Headers")
     print("="*50)
     
-    client = DoctorToolsClient()
+    client = EkaEMRClient()
     print(f"Client custom headers: {client._custom_headers}")
     
     try:
@@ -58,7 +58,7 @@ async def demo_with_custom_headers():
         print(f"  {key}: {value}")
     
     # Create client with custom headers
-    client = DoctorToolsClient(custom_headers=custom_headers)
+    client = EkaEMRClient(custom_headers=custom_headers)
     print(f"\nClient initialized with {len(client._custom_headers)} custom headers")
     
     try:
@@ -103,9 +103,9 @@ async def demo_different_clients_different_headers():
         "X-Admin-Level": "super"
     }
     
-    mobile_client = DoctorToolsClient(custom_headers=mobile_headers)
-    web_client = DoctorToolsClient(custom_headers=web_headers)
-    admin_client = DoctorToolsClient(custom_headers=admin_headers)
+    mobile_client = EkaEMRClient(custom_headers=mobile_headers)
+    web_client = EkaEMRClient(custom_headers=web_headers)
+    admin_client = EkaEMRClient(custom_headers=admin_headers)
     
     print(f"Mobile client headers: {mobile_client._custom_headers}")
     print(f"Web client headers: {web_client._custom_headers}")  
@@ -162,7 +162,7 @@ async def demo_header_use_cases():
             print(f"  {key}: {value}")
         
         # You could create a client for each use case
-        client = DoctorToolsClient(custom_headers=headers)
+        client = EkaEMRClient(custom_headers=headers)
         print(f"  ✅ Client ready with {len(client._custom_headers)} headers")
         await client.close()
 
