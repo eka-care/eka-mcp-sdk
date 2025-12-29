@@ -5,6 +5,13 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 
+from ..utils.enrichment_helpers import (
+    get_cached_data,
+    extract_doctor_summary,
+    extract_clinic_summary,
+    get_appointment_status_info
+)
+
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
 from ..services.patient_service import PatientService
@@ -25,7 +32,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns a list of patients matching the search criteria."""
-        await ctx.info(f"Searching patients with prefix: {prefix}")
+        await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
         await ctx.debug(f"Search parameters - limit: {limit}, select: {select}")
         
         try:
@@ -35,11 +42,11 @@ def register_patient_tools(mcp: FastMCP) -> None:
             result = await patient_service.search_patients(prefix, limit, select)
             
             patient_count = len(result.get('patients', [])) if isinstance(result, dict) else 0
-            await ctx.info(f"Found {patient_count} patients matching search criteria")
+            await ctx.info(f"[search_patients] Found {patient_count} patients matching search criteria\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"Patient search failed: {e.message} (status: {e.status_code})")
+            await ctx.error(f"[search_patients] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -53,16 +60,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
         description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information."
     )
     async def get_patient_details_basic(
-        patient_id: Annotated[str, "Patient's unique identifier"]
+        patient_id: Annotated[str, "Patient's unique identifier"],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns basic patient profile including personal and medical information only."""
+        await ctx.info(f"[get_patient_details_basic] Getting basic patient details for: {patient_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.get_patient_details_basic(patient_id)
+            
+            await ctx.info(f"[get_patient_details_basic] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_patient_details_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -94,7 +108,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Returns:
             Complete patient profile with enriched appointment history including doctor and clinic details
         """
-        await ctx.info(f"Fetching comprehensive profile for patient: {patient_id}")
+        await ctx.info(f"[get_comprehensive_patient_profile] Getting comprehensive profile for patient: {patient_id}")
         await ctx.debug(f"Include appointments: {include_appointments}, limit: {appointment_limit}")
         
         try:
@@ -105,11 +119,11 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 patient_id, include_appointments, appointment_limit
             )
             
-            await ctx.info("Successfully retrieved comprehensive patient profile")
+            await ctx.info(f"[get_comprehensive_patient_profile] Completed successfully\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"Failed to fetch patient profile: {e.message} (status: {e.status_code})")
+            await ctx.error(f"[get_comprehensive_patient_profile] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -130,7 +144,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Returns:
             Created patient profile with oid identifier
         """
-        await ctx.info("Creating new patient profile")
+        await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
         
         try:
@@ -140,11 +154,11 @@ def register_patient_tools(mcp: FastMCP) -> None:
             result = await patient_service.add_patient(patient_data)
             
             patient_id = result.get('oid') if isinstance(result, dict) else None
-            await ctx.info(f"Successfully created patient profile (ID: {patient_id})")
+            await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"Failed to create patient: {e.message} (status: {e.status_code})")
+            await ctx.error(f"[add_patient] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -160,7 +174,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
         page_size: Optional[int] = None,
         select: Optional[str] = None,
         from_timestamp: Optional[int] = None,
-        include_archived: bool = False
+        include_archived: bool = False,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         List patient profiles with pagination.
@@ -175,13 +190,20 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Returns:
             Paginated list of patient profiles
         """
+        await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.list_patients(page_no, page_size, select, from_timestamp, include_archived)
+            
+            patient_count = len(result.get('patients', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[list_patients] Completed successfully - retrieved {patient_count} patients\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[list_patients] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -194,7 +216,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def update_patient(
         patient_id: str,
-        update_data: Dict[str, Any]
+        update_data: Dict[str, Any],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Update patient profile details.
@@ -206,13 +229,19 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Returns:
             Success message confirming profile update
         """
+        await ctx.info(f"[update_patient] Updating patient {patient_id} - fields: {list(update_data.keys())}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
             result = await patient_service.update_patient(patient_id, update_data)
+            
+            await ctx.info(f"[update_patient] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[update_patient] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
