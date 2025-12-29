@@ -2,6 +2,8 @@ from typing import Any, Dict, Optional
 import logging
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -14,7 +16,10 @@ def register_prescription_tools(mcp: FastMCP) -> None:
     """Register Prescription Management MCP tools."""
     
     @mcp.tool()
-    async def get_prescription_details_basic(prescription_id: str) -> Dict[str, Any]:
+    async def get_prescription_details_basic(
+        prescription_id: str,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
         """
         Get basic prescription details (prescription data only).
         
@@ -27,13 +32,19 @@ def register_prescription_tools(mcp: FastMCP) -> None:
         Returns:
             Basic prescription details including medications and diagnosis only
         """
+        await ctx.info(f"Getting basic prescription details for: {prescription_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             prescription_service = PrescriptionService(client)
             result = await prescription_service.get_prescription_details_basic(prescription_id)
+            
+            await ctx.info("Retrieved basic prescription details successfully")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Failed to get prescription details: {e.message}")
             return {
                 "success": False,
                 "error": {
@@ -48,7 +59,8 @@ def register_prescription_tools(mcp: FastMCP) -> None:
         prescription_id: str,
         include_patient_details: bool = True,
         include_doctor_details: bool = True,
-        include_clinic_details: bool = True
+        include_clinic_details: bool = True,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         🌟 RECOMMENDED: Get comprehensive prescription details with enriched patient, doctor, and clinic information.
@@ -66,6 +78,9 @@ def register_prescription_tools(mcp: FastMCP) -> None:
         Returns:
             Complete prescription details with enriched patient, doctor, and clinic information
         """
+        await ctx.info(f"Getting comprehensive prescription details for: {prescription_id}")
+        await ctx.debug(f"Include patient: {include_patient_details}, doctor: {include_doctor_details}, clinic: {include_clinic_details}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -73,8 +88,12 @@ def register_prescription_tools(mcp: FastMCP) -> None:
             result = await prescription_service.get_comprehensive_prescription_details(
                 prescription_id, include_patient_details, include_doctor_details, include_clinic_details
             )
+            
+            await ctx.info("Retrieved comprehensive prescription details successfully")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Failed to get comprehensive prescription: {e.message}")
             return {
                 "success": False,
                 "error": {

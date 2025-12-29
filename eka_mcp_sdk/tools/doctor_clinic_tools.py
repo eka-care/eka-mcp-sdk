@@ -2,6 +2,10 @@ from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
+
+from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -16,15 +20,25 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         description="Get clinic and doctor details for the business"
     )
-    async def get_business_entities() -> Dict[str, Any]:
+    async def get_business_entities(
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
         """Returns complete list of clinics and doctors associated with the business."""
+        await ctx.info(f"[get_business_entities] Getting business entities (clinics and doctors)")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_business_entities()
+            
+            clinic_count = len(result.get('clinics', [])) if isinstance(result, dict) else 0
+            doctor_count = len(result.get('doctors', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[get_business_entities] Completed successfully - {clinic_count} clinics, {doctor_count} doctors\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_business_entities] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -35,7 +49,10 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool()
-    async def get_doctor_profile_basic(doctor_id: str) -> Dict[str, Any]:
+    async def get_doctor_profile_basic(
+        doctor_id: str,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
         """
         Get basic doctor profile information (profile data only).
         
@@ -48,13 +65,19 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         Returns:
             Basic doctor profile including specialties, contact info, and background only
         """
+        await ctx.info(f"[get_doctor_profile_basic] Getting basic doctor profile for: {doctor_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
+            
+            await ctx.info(f"[get_doctor_profile_basic] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_doctor_profile_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -65,7 +88,10 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool()
-    async def get_clinic_details_basic(clinic_id: str) -> Dict[str, Any]:
+    async def get_clinic_details_basic(
+        clinic_id: str,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
         """
         Get basic information about a clinic (clinic data only).
         
@@ -78,13 +104,19 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         Returns:
             Basic clinic details including address, facilities, and services only
         """
+        await ctx.info(f"[get_clinic_details_basic] Getting basic clinic details for: {clinic_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
+            
+            await ctx.info(f"[get_clinic_details_basic] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_clinic_details_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -95,7 +127,10 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool()
-    async def get_doctor_services(doctor_id: str) -> Dict[str, Any]:
+    async def get_doctor_services(
+        doctor_id: str,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
         """
         Get services offered by a doctor.
         
@@ -105,13 +140,20 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         Returns:
             List of services and specialties offered by the doctor
         """
+        await ctx.info(f"[get_doctor_services] Getting services for doctor: {doctor_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_services(doctor_id)
+            
+            service_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[get_doctor_services] Completed successfully - {service_count} services\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_doctor_services] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -127,7 +169,8 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         include_clinics: bool = True,
         include_services: bool = True,
         include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10
+        appointment_limit: Optional[int] = 10,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get comprehensive doctor profile including associated clinics, services, and recent appointments.
@@ -142,6 +185,8 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         Returns:
             Complete doctor profile with enriched clinic details, services, and appointment history
         """
+        await ctx.info(f"[get_comprehensive_doctor_profile] Getting comprehensive profile for doctor: {doctor_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -149,8 +194,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             result = await doctor_clinic_service.get_comprehensive_doctor_profile(
                 doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
             )
+            
+            await ctx.info(f"[get_comprehensive_doctor_profile] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_comprehensive_doctor_profile] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -166,7 +215,8 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         include_doctors: bool = True,
         include_services: bool = True,
         include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10
+        appointment_limit: Optional[int] = 10,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get comprehensive clinic profile including associated doctors, services, and recent appointments.
@@ -181,6 +231,8 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         Returns:
             Complete clinic profile with enriched doctor details, services, and appointment history
         """
+        await ctx.info(f"[get_comprehensive_clinic_profile] Getting comprehensive profile for clinic: {clinic_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -188,8 +240,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             result = await doctor_clinic_service.get_comprehensive_clinic_profile(
                 clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit
             )
+            
+            await ctx.info(f"[get_comprehensive_clinic_profile] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_comprehensive_clinic_profile] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

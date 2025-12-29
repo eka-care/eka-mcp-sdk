@@ -2,10 +2,18 @@ from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
+from ..utils.enrichment_helpers import (
+    get_cached_data,
+    extract_patient_summary,
+    extract_doctor_summary,
+    extract_clinic_summary
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +27,24 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     async def get_appointment_slots(
         doctor_id: Annotated[str, "Doctor's unique identifier"],
         clinic_id: Annotated[str, "Clinic's unique identifier"],
-        date: Annotated[str, "Date for appointment slots (YYYY-MM-DD format)"]
+        date: Annotated[str, "Date for appointment slots (YYYY-MM-DD format)"],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns available appointment slots with timing and pricing information."""
+        await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, date)
+            
+            slot_count = len(result.get('slots', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[get_appointment_slots] Completed successfully - {slot_count} slots available\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_slots] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -42,16 +58,25 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         description="Book an appointment slot for a patient"
     )
     async def book_appointment(
-        appointment_data: Annotated[Dict[str, Any], "Appointment details including patient, doctor, timing, and mode"]
+        appointment_data: Annotated[Dict[str, Any], "Appointment details including patient, doctor, timing, and mode"],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns booked appointment details with confirmation."""
+        await ctx.info(f"[book_appointment] Booking appointment for patient {appointment_data.get('patientId', 'unknown')}")
+        await ctx.debug(f"Appointment data: mode={appointment_data.get('mode')}, doctor={appointment_data.get('doctorId')}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.book_appointment(appointment_data)
+            
+            appointment_id = result.get('appointmentId') or result.get('id')
+            await ctx.info(f"[book_appointment] Completed successfully - ID: {appointment_id}\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[book_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -68,7 +93,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         patient_id: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        page_no: int = 0
+        page_no: int = 0,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         🌟 RECOMMENDED: Get appointments with comprehensive details including patient names, doctor profiles, and clinic information.
@@ -88,6 +114,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Enriched appointments with patient names, doctor details, and clinic information
         """
+        filters = [f for f in [f"doctor={doctor_id}" if doctor_id else None, 
+                              f"clinic={clinic_id}" if clinic_id else None,
+                              f"patient={patient_id}" if patient_id else None,
+                              f"dates={start_date} to {end_date}" if start_date or end_date else None] if f]
+        filter_str = ", ".join(filters) if filters else "no filters"
+        await ctx.info(f"[get_appointments_enriched] Getting enriched appointments with {filter_str}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -101,8 +134,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 page_no=page_no
             )
             
+            appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[get_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_appointments_enriched] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -119,7 +156,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         patient_id: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        page_no: int = 0
+        page_no: int = 0,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get basic appointments data (IDs only). 
@@ -138,6 +176,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Basic appointments with entity IDs only
         """
+        await ctx.info(f"[get_appointments_basic] Getting basic appointments - page {page_no}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -150,8 +190,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 end_date=end_date,
                 page_no=page_no
             )
+            
+            appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[get_appointments_basic] Completed successfully - {appointment_count} appointments\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_appointments_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -164,7 +209,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def get_appointment_details_enriched(
         appointment_id: str,
-        partner_id: Optional[str] = None
+        partner_id: Optional[str] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         🌟 RECOMMENDED: Get comprehensive appointment details with complete patient, doctor, and clinic information.
@@ -179,13 +225,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Complete appointment details with enriched patient, doctor, and clinic information
         """
+        await ctx.info(f"[get_appointment_details_enriched] Getting enriched details for appointment: {appointment_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
+            
+            await ctx.info(f"[get_appointment_details_enriched] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_details_enriched] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -198,7 +250,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def get_appointment_details_basic(
         appointment_id: str,
-        partner_id: Optional[str] = None
+        partner_id: Optional[str] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get basic appointment details (IDs only).
@@ -213,13 +266,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Basic appointment details with entity IDs only
         """
+        await ctx.info(f"[get_appointment_details_basic] Getting basic details for appointment: {appointment_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
+            
+            await ctx.info(f"[get_appointment_details_basic] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_details_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -232,7 +291,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def get_patient_appointments_enriched(
         patient_id: str,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         🌟 RECOMMENDED: Get all appointments for a specific patient with enriched doctor and clinic details.
@@ -247,8 +307,20 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             List of enriched appointments for the patient with doctor and clinic information
         """
+        await ctx.info(f"[get_patient_appointments_enriched] Getting enriched appointments for patient: {patient_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
+            client = DoctorToolsClient(access_token=token.token if token else None)
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
+            
+            appointment_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[get_patient_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_patient_appointments_enriched] Failed: {e.message}\n")
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
@@ -266,7 +338,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def get_patient_appointments_basic(
         patient_id: str,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get basic appointments for a specific patient (IDs only).
@@ -281,13 +354,20 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Basic appointments with entity IDs only
         """
+        await ctx.info(f"[get_patient_appointments_basic] Getting basic appointments for patient: {patient_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
+            
+            appointment_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[get_patient_appointments_basic] Completed successfully - {appointment_count} appointments\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[get_patient_appointments_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -301,7 +381,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     async def update_appointment(
         appointment_id: str,
         update_data: Dict[str, Any],
-        partner_id: Optional[str] = None
+        partner_id: Optional[str] = None,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Update an existing appointment.
@@ -314,13 +395,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Updated appointment details
         """
+        await ctx.info(f"[update_appointment] Updating appointment {appointment_id} - fields: {list(update_data.keys())}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
+            
+            await ctx.info(f"[update_appointment] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[update_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -333,7 +420,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def complete_appointment(
         appointment_id: str,
-        completion_data: Dict[str, Any]
+        completion_data: Dict[str, Any],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Mark an appointment as completed.
@@ -345,13 +433,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Completion confirmation with updated appointment status
         """
+        await ctx.info(f"[complete_appointment] Completing appointment: {appointment_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.complete_appointment(appointment_id, completion_data)
+            
+            await ctx.info(f"[complete_appointment] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[complete_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -364,7 +458,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def cancel_appointment(
         appointment_id: str,
-        cancel_data: Dict[str, Any]
+        cancel_data: Dict[str, Any],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Cancel an appointment.
@@ -376,13 +471,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Cancellation confirmation with updated appointment status
         """
+        await ctx.info(f"[cancel_appointment] Cancelling appointment: {appointment_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
+            
+            await ctx.info(f"[cancel_appointment] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[cancel_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -395,7 +496,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     async def reschedule_appointment(
         appointment_id: str,
-        reschedule_data: Dict[str, Any]
+        reschedule_data: Dict[str, Any],
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Reschedule an appointment to a new date/time.
@@ -407,13 +509,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
             Rescheduled appointment details with new timing
         """
+        await ctx.info(f"[reschedule_appointment] Rescheduling appointment: {appointment_id}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
+            
+            await ctx.info(f"[reschedule_appointment] Completed successfully\n")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"[reschedule_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

@@ -2,6 +2,8 @@ from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
 
 from ..clients.doctor_tools_client import DoctorToolsClient
 from ..auth.models import EkaAPIError
@@ -21,9 +23,16 @@ def register_assessment_tools(mcp: FastMCP) -> None:
         unique_identifier: Annotated[Optional[str], "Unique identifier for filtering/ patient oid"] = None,
         transaction_id: Annotated[Optional[str], "Transaction ID for filtering"] = None,
         wfids: Annotated[Optional[List[str]], "List of workflow IDs to filter"] = None,
-        status: Annotated[str, "Status filter (e.g., COMPLETED, IN_PROGRESS)"] = "COMPLETED"
+        status: Annotated[str, "Status filter (e.g., COMPLETED, IN_PROGRESS)"] = "COMPLETED",
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """Returns grouped assessment data with patient and practitioner details."""
+        filters = [f for f in [f"practitioner={practitioner_uuid}" if practitioner_uuid else None,
+                              f"patient={patient_uuid}" if patient_uuid else None,
+                              f"status={status}"] if f]
+        filter_str = ", ".join(filters) if filters else "no filters"
+        await ctx.info(f"Fetching grouped assessments with {filter_str}")
+        
         try:
             token: AccessToken | None = get_access_token()
             client = DoctorToolsClient(access_token=token.token if token else None)
@@ -38,8 +47,13 @@ def register_assessment_tools(mcp: FastMCP) -> None:
                 wfids=wfids,
                 status=status
             )
+            
+            assessment_count = len(result.get('assessments', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"Retrieved {assessment_count} grouped assessments")
+            
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            await ctx.error(f"Failed to fetch assessments: {e.message}")
             return {
                 "success": False,
                 "error": {
