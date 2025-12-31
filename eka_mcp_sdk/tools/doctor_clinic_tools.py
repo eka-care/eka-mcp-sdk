@@ -18,12 +18,23 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     """Register Doctor and Clinic Information MCP tools."""
     
     @mcp.tool(
-        description="Get clinic and doctor details for the business"
+        description="Get all doctors and clinics details for a business. Use this to find doctor_id and clinic_id by doctor name for bookings."
     )
     async def get_business_entities(
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns complete list of clinics and doctors associated with the business."""
+        """
+        Get all doctors and clinics in workspace.
+        
+        Use when:
+        - "Book with Dr. X" → Find doctor by name
+        - "Which doctors available?" → List all
+        - Need doctor_id/clinic_id
+        
+        Returns:
+        - doctors[]: doctor_id, name, specialization
+        - clinics[]: clinic_id, name, doctors[]
+        """
         await ctx.info(f"[get_business_entities] Getting business entities (clinics and doctors)")
         
         try:

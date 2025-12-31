@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
+from datetime import datetime
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
@@ -8,6 +9,7 @@ from fastmcp.server.context import Context
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
+from .models import AppointmentBookingRequest
 from ..utils.enrichment_helpers import (
     get_cached_data,
     extract_patient_summary,
@@ -22,22 +24,43 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
-        description="Get available appointment slots for a doctor at a specific clinic on a given date"
+        description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking."
     )
     async def get_appointment_slots(
-        doctor_id: Annotated[str, "Doctor's unique identifier"],
-        clinic_id: Annotated[str, "Clinic's unique identifier"],
-        date: Annotated[str, "Date for appointment slots (YYYY-MM-DD format)"],
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        start_date: Annotated[str, "Start date YYYY-MM-DD"],
+        end_date: Annotated[str, "End date YYYY-MM-DD (max: start_date + 1)"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns available appointment slots with timing and pricing information."""
-        await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
+        """
+        Check slot availability.
+        
+        ⚠️ Limit: D to D+1 only (today to tomorrow)
+        Example: "2025-12-30" to "2025-12-31" ✅
+                 "2025-12-30" to "2026-01-02" ❌
+        
+        Time hints:
+        - "noon" → Check 12:00-13:00
+        - "3pm" → Check 15:00
+        - "morning" → Check 09:00-12:00
+        
+        Returns: slots[] with start_time, end_time, available
+        
+        Workflow: "Book at noon"
+        1. Calculate date (today/tomorrow)
+        2. get_appointment_slots(doctor_id, clinic_id, date, date)
+        3. Find 12:00 slot
+        4. If available → book_appointment
+           If not → Suggest alternatives
+        """
+        await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} from {start_date} to {end_date}")
         
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
-            result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, date)
+            result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
             
             slot_count = len(result.get('slots', [])) if isinstance(result, dict) else 0
             await ctx.info(f"[get_appointment_slots] Completed successfully - {slot_count} slots available\n")
@@ -55,24 +78,88 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Book an appointment slot for a patient"
+        description="🌟 Book appointment for a patient. Need: patient_id, doctor_id, clinic_id, date, time. Check slots first recommended."
     )
     async def book_appointment(
-        appointment_data: Annotated[Dict[str, Any], "Appointment details including patient, doctor, timing, and mode"],
+        booking: Annotated[
+            AppointmentBookingRequest,
+            """Appointment booking details with all required fields.
+            
+            Required fields:
+            - patient_id: From list_patients or get_patient_by_mobile (e.g., "176650465340471")
+            - doctor_id: From get_business_entities (e.g., "do1765290197897")
+            - clinic_id: From get_business_entities (e.g., "c-b4c014c9c2aa415c88c9aaa7")
+            - date: YYYY-MM-DD format (e.g., "2025-12-30")
+            - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
+            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30")
+            
+            Optional fields:
+            - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
+            - reason: Visit reason (e.g., "Regular checkup")
+            
+            Time conversions:
+            - "noon" → 12:00, "3pm" → 15:00, "3:30pm" → 15:30
+            - Default duration: 30 minutes
+            """
+        ],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns booked appointment details with confirmation."""
-        await ctx.info(f"[book_appointment] Booking appointment for patient {appointment_data.get('patientId', 'unknown')}")
-        await ctx.debug(f"Appointment data: mode={appointment_data.get('mode')}, doctor={appointment_data.get('doctorId')}")
+        """Book appointment.
+        
+        Prerequisites:
+        1. patient_id: From list_patients or get_patient_by_mobile
+        2. doctor_id, clinic_id: From get_business_entities
+        3. Available slot: Check with get_appointment_slots (recommended)
+        
+        Workflow: "Book with Dr. C at noon tomorrow"
+        1. get_patient_by_mobile → patient_id
+        2. get_business_entities → doctor_id, clinic_id
+        3. get_appointment_slots → Verify 12:00 available
+        4. book_appointment({
+            "patient_id": "...",
+            "doctor_id": "...",
+            "clinic_id": "...",
+            "date": "2025-12-30",
+            "start_time": "12:00",
+            "end_time": "12:30"
+        })
+        
+        Returns: appointment_id
+        """
+        await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
+        await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
         
         try:
+            # Convert date and time to Unix timestamps
+            date_time_start = datetime.strptime(f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M")
+            date_time_end = datetime.strptime(f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M")
+            start_timestamp = int(date_time_start.timestamp())
+            end_timestamp = int(date_time_end.timestamp())
+            
+            # Build request body matching Eka Care API format (EkaIds tab)
+            # Top-level: clinic_id, doctor_id, patient_id (snake_case)
+            # Nested: appointment_details with Unix timestamps
+            appointment_data = {
+                "clinic_id": booking.clinic_id,
+                "doctor_id": booking.doctor_id,
+                "patient_id": booking.patient_id,
+                "appointment_details": {
+                    "start_time": start_timestamp,
+                    "end_time": end_timestamp,
+                    "mode": booking.mode
+                }
+            }
+            if booking.reason:
+                appointment_data["appointment_details"]["reason"] = booking.reason
+            
+            await ctx.debug(f"Constructed appointment data: {appointment_data}")
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None)
             appointment_service = AppointmentService(client)
             result = await appointment_service.book_appointment(appointment_data)
             
-            appointment_id = result.get('appointmentId') or result.get('id')
-            await ctx.info(f"[book_appointment] Completed successfully - ID: {appointment_id}\n")
+            appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
+            await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
@@ -86,13 +173,15 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both)."
+    )
     async def get_appointments_enriched(
-        doctor_id: Optional[str] = None,
-        clinic_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        patient_id: Annotated[Optional[str], "Filter by patient (cannot use with dates)"] = None,
+        doctor_id: Annotated[Optional[str], "Filter by doctor"] = None,
+        clinic_id: Annotated[Optional[str], "Filter by clinic"] = None,
+        start_date: Annotated[Optional[str], "From date YYYY-MM-DD (cannot use with patient_id)"] = None,
+        end_date: Annotated[Optional[str], "To date YYYY-MM-DD (cannot use with patient_id)"] = None,
         page_no: int = 0,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
@@ -103,16 +192,17 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         without requiring additional API calls. Use this instead of get_appointments_basic unless you
         specifically need only basic appointment data.
         
-        Args:
-            doctor_id: Filter by doctor ID (optional)
-            clinic_id: Filter by clinic ID (optional)
-            patient_id: Filter by patient ID (optional)
-            start_date: Start date filter (YYYY-MM-DD format, optional)
-            end_date: End date filter (YYYY-MM-DD format, optional)
-            page_no: Page number for pagination (starts from 0)
+        ⚠️ Filter rules:
+        - patient_id alone: All patient appointments
+        - dates: Appointments in range (no patient_id)
+        - doctor_id/clinic_id: Combine with dates
         
-        Returns:
-            Enriched appointments with patient names, doctor details, and clinic information
+        Use when:
+        - "Show my appointments" → get_appointments_enriched(patient_id=X)
+        - "Today's appointments" → get_appointments_enriched(start_date=today, end_date=today)
+        - "Dr. X schedule" → get_appointments_enriched(doctor_id=X)
+        
+        Returns: Appointments with doctor names, clinic addresses, status
         """
         filters = [f for f in [f"doctor={doctor_id}" if doctor_id else None, 
                               f"clinic={clinic_id}" if clinic_id else None,

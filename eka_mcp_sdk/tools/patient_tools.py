@@ -22,16 +22,22 @@ logger = logging.getLogger(__name__)
 def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
-    @mcp.tool(
-        description="Search patient profiles by username, mobile, or full name using prefix matching"
-    )
+    # @mcp.tool(
+    #     description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile."
+    # )
     async def search_patients(
-        prefix: Annotated[str, "Search term to match against patient profiles (username, mobile, or full name)"],
+        prefix: Annotated[str, "Search prefix to match against patient profiles (username, mobile, or full name)"],
         limit: Annotated[Optional[int], "Maximum number of results to return (default: 50, max: 50)"] = None,
         select: Annotated[Optional[str], "Comma-separated list of additional fields to include"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns a list of patients matching the search criteria."""
+        """
+        Search patients by prefix (workspace-specific feature).
+        
+        For general patient lookup, use:
+        - list_patients: View all patients with pagination
+        - get_patient_by_mobile: Find by exact mobile number
+        """
         await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
         await ctx.debug(f"Search parameters - limit: {limit}, select: {select}")
         
@@ -86,24 +92,26 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Get complete patient profile with appointment history. Use for 'show patient details' or viewing appointments."
+    )
     async def get_comprehensive_patient_profile(
-        patient_id: str,
-        include_appointments: bool = True,
-        appointment_limit: Optional[int] = None,
+        patient_id: Annotated[str, "Patient ID (oid from list/mobile lookup)"],
+        include_appointments: Annotated[bool, "Include appointments (default: True)"] = True,
+        appointment_limit: Annotated[Optional[int], "Limit appointments"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        🌟 RECOMMENDED: Get comprehensive patient profile including detailed appointment history with enriched doctor and clinic information.
+        RECOMMENDED: Get comprehensive patient profile including detailed appointment history with enriched doctor and clinic information.
         
         This is the preferred tool for getting patient information as it provides complete context
         including appointment history with doctor names, clinic details, and appointment status.
         Use this instead of get_patient_details_basic unless you specifically need only profile data.
         
-        Args:
-            patient_id: Patient's unique identifier
-            include_appointments: Whether to include appointment history (default: True)
-            appointment_limit: Limit number of appointments returned (optional)
+        Use when:
+        - "Show patient details"
+        - "Patient medical history"
+        - Need appointments with doctor/clinic names
         
         Returns:
             Complete patient profile with enriched appointment history including doctor and clinic details
@@ -133,16 +141,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
-    async def add_patient(patient_data: Dict[str, Any], ctx: Context = CurrentContext()) -> Dict[str, Any]:
+    @mcp.tool(
+        description="Create new patient. Required: fln (name), dob (YYYY-MM-DD), gen (M/F/O). Use when patient not found."
+    )
+    # pydantic model should be used here for patient_data
+    async def add_patient(
+        patient_data: Annotated[Dict[str, Any], "Required: fln, dob, gen. Optional: mobile (+91...), email, address"],
+        ctx: Context = CurrentContext()
+        ) -> Dict[str, Any]:
         """
-        Create a new patient profile.
+        Create patient profile.
         
-        Args:
-            patient_data: Patient information including fln (name), dob, gen, and optional fields like mobile, email, etc.
+        Required: fln, dob, gen
+        Optional: mobile, email, address
         
-        Returns:
-            Created patient profile with oid identifier
+        Example: {"fln": "John Doe", "dob": "1990-01-15", "gen": "M", "mobile": "+919876543210"}
+        
+        Returns: Patient with oid (patient_id)
         """
         await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
@@ -168,27 +183,26 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        description="List patient profiles by browsing pages when no identifier is known"
+    )
     async def list_patients(
-        page_no: int,
-        page_size: Optional[int] = None,
-        select: Optional[str] = None,
-        from_timestamp: Optional[int] = None,
-        include_archived: bool = False,
+        page_no: Annotated[int, "Page number (starts from 0)"],
+        page_size: Annotated[Optional[int], "Records per page (default: 500, max: 2000)"] = None,
+        select: Annotated[Optional[str], "Additional fields"] = None,
+        from_timestamp: Annotated[Optional[int], "Filter: created after timestamp"] = None,
+        include_archived: Annotated[bool, "Include archived (default: False)"] = False,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        List patient profiles with pagination.
+        List all patients with pagination.
         
-        Args:
-            page_no: Page number (required)
-            page_size: Number of records per page (default: 500, max: 2000)
-            select: Comma-separated list of additional fields to include
-            from_timestamp: Get profiles created after this epoch timestamp
-            include_archived: Include archived profiles in response
+        Use when the user wants to:
+        - browse patients
+        - scroll through patient records
+        - refer to themselves without providing an identifier
         
-        Returns:
-            Paginated list of patient profiles
+        Returns: List with oid (patient_id), fln (name), mobile
         """
         await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
         
@@ -282,20 +296,24 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+            description="🌟 Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
+    )
     async def get_patient_by_mobile(
-        mobile: str,
-        full_profile: bool = False
+        mobile: Annotated[str, "Mobile with country code: +919876543210"],
+        full_profile: Annotated[bool, "Return full profile (default: False)"] = False,
+        ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Retrieve patient profiles by mobile number.
+        Find patient by exact mobile number.
         
-        Args:
-            mobile: Mobile number in format +<country_code><number> (e.g., +911234567890)
-            full_profile: If True, returns full patient profile details
+        Format: +<country_code><number>
+        - India: +919876543210
+        - US: +11234567890
         
-        Returns:
-            Patient profile(s) matching the mobile number
+        Use when: "Book appointment" → Ask "Your mobile?" → Call this
+        
+        Returns: Patient with oid (patient_id)
         """
         try:
             token: AccessToken | None = get_access_token()
