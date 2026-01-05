@@ -1,13 +1,14 @@
 import asyncio
+import argparse
 import logging
 from typing import Optional
 from fastmcp import FastMCP
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 
-from .config.settings import EkaSettings
-from .sdk import EkaMCPSDK
-from .tools.doctor_tools import register_doctor_tools
+from eka_mcp_sdk.config.settings import EkaSettings
+from eka_mcp_sdk.sdk import EkaMCPSDK
+from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ def create_mcp_server() -> FastMCP:
     
     mcp = FastMCP(
         name="Eka.care EMR API Server",
+        stateless_http=True,
         instructions="""
             This is the Eka.care EMR API Server. It is used to manage the Eka.care EMR system.
             Provides capabilities to manage appointments, prescriptions, and patient records.
@@ -54,10 +56,37 @@ def create_mcp_server() -> FastMCP:
 
 def main():
     """Main entry point for the MCP server."""
-    logger.info("Starting Eka.care MCP Server...")
+    parser = argparse.ArgumentParser(description="Eka.care MCP Server")
+    parser.add_argument(
+        "--transport", 
+        choices=["stdio", "http"], 
+        default="stdio",
+        help="Transport type: stdio (default) or http"
+    )
+    parser.add_argument(
+        "--host",
+        default="localhost",
+        help="Host for HTTP transport (default: localhost)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8888,
+        help="Port for HTTP transport (default: 8888)"
+    )
+    
+    args = parser.parse_args()
+    
+    logger.info(f"Starting Eka.care MCP Server with {args.transport} transport...")
     
     mcp = create_mcp_server()
-    mcp.run(transport="stdio")
+    
+    if args.transport == "http":
+        logger.info(f"Running HTTP server on {args.host}:{args.port}")
+        mcp.run(transport="http", host=args.host, port=args.port)
+    else:
+        logger.info("Running with stdio transport")
+        mcp.run()
 
 
 if __name__ == "__main__":
