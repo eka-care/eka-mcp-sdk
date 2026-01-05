@@ -92,8 +92,9 @@ class AuthenticationManager:
         payload = {
             "client_id": self._settings.client_id,
             "client_secret": self._settings.client_secret,
-            "api_key": self._settings.api_key
         }
+        if self._settings.api_key:
+            payload["api_key"] = self._settings.api_key
         
         logger.info(f"Making login request to: {url}")
         logger.debug(f"Request payload: {payload}")
