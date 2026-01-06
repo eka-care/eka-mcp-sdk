@@ -321,7 +321,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Do not use for permanently deleting patient data or creating/updating profiles.
 
         Trigger Keywords:
-        archive patient, unarchive patient, soft delete patient, restore patient profile, toggle patient archive status
+        archive patient, unarchive patient, soft delete patient, restore patient profile, toggle patient archive status, remove for now
         
         Returns:
             Success message confirming profile archival
