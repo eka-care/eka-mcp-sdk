@@ -32,11 +32,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Search patients by prefix (workspace-specific feature).
+        Search for patients within the current workspace using a text prefix.
+        The prefix is matched against patient username, mobile number, or full name.
+
+        Recommended Usage
+        Use this tool when implementing autocomplete, quick search, or typeahead
+        functionality where users need to find patients by partial input.
+        This tool is workspace-scoped and optimized for prefix-based searches.
         
         For general patient lookup, use:
         - list_patients: View all patients with pagination
         - get_patient_by_mobile: Find by exact mobile number
+
+        Trigger Keywords
+        search patient, patient search, find patient, quick patient search
+
+        Returns dict with success (bool) and data (dict) #CHANGE
+        
         """
         await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
         await ctx.debug(f"Search parameters - limit: {limit}, select: {select}")
@@ -69,7 +81,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
         patient_id: Annotated[str, "Patient's unique identifier"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns basic patient profile including personal and medical information only."""
+        """
+        Fetches basic patient profile details using patient profile ID.
+
+        Recommended Usage:
+        Use when you only need core patient profile information (demographics and limited medical data) tied to a known profile ID. 
+        For full clinical, encounter, or longitudinal data => prefer get_comprehensive_patient_profile.
+
+        Trigger Keywords:
+        get patient details, fetch patient profile, lookup patient by profile id
+        retrieve basic patient information
+
+        What to Return:
+        Returns a JSON object with two fields
+        -success: True if successful, False otherwise
+        -data: Patient profile details
+
+        """
         await ctx.info(f"[get_patient_details_basic] Getting basic patient details for: {patient_id}")
         
         try:
@@ -150,15 +178,22 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
         ) -> Dict[str, Any]:
         """
-        Create patient profile.
+        Creates a new patient profile and returns a unique patient identifier.
+
+        Recommended Usage:
+        Use when registering a new patient profile with basic demographic information.
+        Do not use to update existing patients or modify partial profile data.
         
-        Required: fln, dob, gen
-        Optional: mobile, email, address
-        
-        Example: {"fln": "John Doe", "dob": "1990-01-15", "gen": "M", "mobile": "+919876543210"}
-        
-        Returns: Patient with oid (patient_id)
+        Trigger Keywords:
+        create patient, add patient profile, register new patient, 
+        new patient registration, create patient record
+
+        What to Return:
+        Returns a JSON object with:
+        - success: boolean indicating whether patient creation succeeded
+        - data: an object containing the created patient profile, including the unique patient ID (oid)
         """
+
         await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
         
@@ -201,8 +236,13 @@ def register_patient_tools(mcp: FastMCP) -> None:
         - browse patients
         - scroll through patient records
         - refer to themselves without providing an identifier
+
+        Do not use when patient identifier (oid) is known.
+
+        Trigger Keywords:
+        list patients, browse patient records, show all patients, view patient list
         
-        Returns: List with oid (patient_id), fln (name), mobile
+        Returns: List with oid (patient_id), fln (full legal name), mobile
         """
         await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
         
@@ -227,18 +267,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Update existing patient profile. Use when correcting or adding patient details."
+    )
     async def update_patient(
-        patient_id: str,
-        update_data: Dict[str, Any],
+        patient_id: Annotated[str, "Unique identifier of the patient to update"],
+        update_data: Annotated[Dict[str, Any], "Dictionary of fields and values to update (e.g., name, mobile, dob)"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Update patient profile details.
-        
-        Args:
-            patient_id: Patient's unique identifier (oid)
-            update_data: Fields to update (name, dob, gen, mobile, email, etc.)
+        Updates an existing patient profile with new or corrected information.
+
+        Recommended Usage:
+        Use when modifying patient details such as name, date of birth, gender, mobile, email, or other demographic/medical fields.
+        Do not use for creating new patient profiles or fetching existing patient data.
+
+        Trigger Keywords:
+        update patient, edit patient profile, modify patient details, change patient information, correct patient record
         
         Returns:
             Success message confirming profile update
@@ -265,26 +310,30 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        description="Archive a patient profile. Use to hide/remove patient profiles."
+    )
     async def archive_patient(
-        patient_id: str,
-        archive: bool = True
+        patient_id: Annotated[str, "Unique identifier of the patient to archive"],
     ) -> Dict[str, Any]:
         """
-        Archive patient profile (soft delete).
+        Archives a patient profile.
         
-        Args:
-            patient_id: Patient's unique identifier (oid)
-            archive: Whether to archive the profile (default: True)
+        Recommended Usage:
+        Use to mark a patient profile as archived
+        Do not use for permanently deleting patient data or creating/updating profiles.
+
+        Trigger Keywords:
+        archive patient, delete patient, toggle patient archive status, remove for now
         
         Returns:
-            Success message confirming profile archival
+            Success message confirming profile removal
         """
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
-            result = await patient_service.archive_patient(patient_id, archive)
+            result = await patient_service.archive_patient(patient_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -297,11 +346,11 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-            description="🌟 Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
+            description=" Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
     )
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],
-        full_profile: Annotated[bool, "Return full profile (default: False)"] = False,
+        full_profile: Annotated[bool, "Return full profile if True (default: False)"] = False,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """

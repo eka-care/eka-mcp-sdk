@@ -194,7 +194,7 @@ class PatientService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.archive_patient(patient_id, archive)
+        return await self.client.archive_patient(patient_id)
     
     async def get_patient_by_mobile(
         self,
