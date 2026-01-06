@@ -267,10 +267,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+            description="Update existing patient profile. Use when correcting or adding patient details."
+    )
     async def update_patient(
-        patient_id: str,
-        update_data: Dict[str, Any],
+        patient_id: Annotated[str, "Unique identifier of the patient to update"],
+        update_data: Annotated[Dict[str, Any], "Dictionary of fields and values to update (e.g., name, mobile, dob)"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -308,10 +310,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+            description="Archive or unarchive a patient profile (soft delete). Use to hide or restore patient profiles."
+    )
     async def archive_patient(
-        patient_id: str,
-        archive: bool = True
+        patient_id: Annotated[str, "Unique identifier of the patient to archive/unarchive"],
+        archive: Annotated[bool, "Set True to archive, False to unarchive (default: True)"] = True
     ) -> Dict[str, Any]:
         """
         Archives or unarchives a patient profile (soft delete).
@@ -347,7 +351,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     )
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],
-        full_profile: Annotated[bool, "Return full profile (default: False)"] = False,
+        full_profile: Annotated[bool, "Return full profile if True (default: False)"] = False,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
