@@ -236,8 +236,13 @@ def register_patient_tools(mcp: FastMCP) -> None:
         - browse patients
         - scroll through patient records
         - refer to themselves without providing an identifier
+
+        Do not use when patient identifier (oid) is known.
+
+        Trigger Keywords:
+        list patients, browse patient records, show all patients, view patient list
         
-        Returns: List with oid (patient_id), fln (name), mobile
+        Returns: List with oid (patient_id), fln (full legal name), mobile
         """
         await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
         
@@ -269,11 +274,14 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Update patient profile details.
-        
-        Args:
-            patient_id: Patient's unique identifier (oid)
-            update_data: Fields to update (name, dob, gen, mobile, email, etc.)
+        Updates an existing patient profile with new or corrected information.
+
+        Recommended Usage:
+        Use when modifying patient details such as name, date of birth, gender, mobile, email, or other demographic/medical fields.
+        Do not use for creating new patient profiles or fetching existing patient data.
+
+        Trigger Keywords:
+        update patient, edit patient profile, modify patient details, change patient information, correct patient record
         
         Returns:
             Success message confirming profile update
@@ -306,11 +314,14 @@ def register_patient_tools(mcp: FastMCP) -> None:
         archive: bool = True
     ) -> Dict[str, Any]:
         """
-        Archive patient profile (soft delete).
+        Archives or unarchives a patient profile (soft delete).
         
-        Args:
-            patient_id: Patient's unique identifier (oid)
-            archive: Whether to archive the profile (default: True)
+        Recommended Usage:
+        Use to mark a patient profile as archived or restore it. 
+        Do not use for permanently deleting patient data or creating/updating profiles.
+
+        Trigger Keywords:
+        archive patient, unarchive patient, soft delete patient, restore patient profile, toggle patient archive status
         
         Returns:
             Success message confirming profile archival
