@@ -93,17 +93,12 @@ class EkaEMRClient(BaseEkaClient):
     async def archive_patient(
         self,
         patient_id: str,
-        archive: bool = True
     ) -> Dict[str, Any]:
         """Archive patient profile."""
-        params = {}
-        if archive:
-            params["arc"] = True
             
         return await self._make_request(
             method="DELETE",
             endpoint=f"/profiles/v1/patient/{patient_id}",
-            params=params if params else None
         )
     
     async def get_patient_by_mobile(

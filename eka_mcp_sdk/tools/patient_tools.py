@@ -268,7 +268,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-            description="Update existing patient profile. Use when correcting or adding patient details."
+        description="Update existing patient profile. Use when correcting or adding patient details."
     )
     async def update_patient(
         patient_id: Annotated[str, "Unique identifier of the patient to update"],
@@ -311,30 +311,29 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-            description="Archive or unarchive a patient profile (soft delete). Use to hide or restore patient profiles."
+        description="Archive a patient profile. Use to hide/remove patient profiles."
     )
     async def archive_patient(
-        patient_id: Annotated[str, "Unique identifier of the patient to archive/unarchive"],
-        archive: Annotated[bool, "Set True to archive, False to unarchive (default: True)"] = True
+        patient_id: Annotated[str, "Unique identifier of the patient to archive"],
     ) -> Dict[str, Any]:
         """
-        Archives or unarchives a patient profile (soft delete).
+        Archives a patient profile.
         
         Recommended Usage:
-        Use to mark a patient profile as archived or restore it. 
+        Use to mark a patient profile as archived
         Do not use for permanently deleting patient data or creating/updating profiles.
 
         Trigger Keywords:
-        archive patient, unarchive patient, soft delete patient, restore patient profile, toggle patient archive status, remove for now
+        archive patient, delete patient, toggle patient archive status, remove for now
         
         Returns:
-            Success message confirming profile archival
+            Success message confirming profile removal
         """
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None)
             patient_service = PatientService(client)
-            result = await patient_service.archive_patient(patient_id, archive)
+            result = await patient_service.archive_patient(patient_id)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {
@@ -347,7 +346,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-            description="🌟 Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
+            description=" Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
     )
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],
