@@ -4,6 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
+from mcp.types import ToolAnnotations
 
 from ..utils.enrichment_helpers import (
     get_cached_data,
@@ -22,9 +23,10 @@ logger = logging.getLogger(__name__)
 def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
-    # @mcp.tool(
-    #     description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile."
-    # )
+    @mcp.tool(
+        description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile.",
+        enabled=False,
+    )
     async def search_patients(
         prefix: Annotated[str, "Search prefix to match against patient profiles (username, mobile, or full name)"],
         limit: Annotated[Optional[int], "Maximum number of results to return (default: 50, max: 50)"] = None,
@@ -75,7 +77,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information."
+        description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information.",
+        tags={"patient", "read"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def get_patient_details_basic(
         patient_id: Annotated[str, "Patient's unique identifier"],
@@ -121,7 +128,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Get complete patient profile with appointment history. Use for 'show patient details' or viewing appointments."
+        description="Get complete patient profile with appointment history. Use for 'show patient details' or viewing appointments.",
+        tags={"patient", "read", "appointments"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def get_comprehensive_patient_profile(
         patient_id: Annotated[str, "Patient ID (oid from list/mobile lookup)"],
@@ -170,7 +182,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Create new patient. Required: fln (name), dob (YYYY-MM-DD), gen (M/F/O). Use when patient not found."
+        description="Create new patient. Required: fln (name), dob (YYYY-MM-DD), gen (M/F/O). Use when patient not found.",
+        tags={"patient", "write"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
     )
     # pydantic model should be used here for patient_data
     async def add_patient(
@@ -219,7 +236,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="List patient profiles by browsing pages when no identifier is known"
+        description="List patient profiles by browsing pages when no identifier is known",
+        tags={"patient", "read", "list", "browse"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def list_patients(
         page_no: Annotated[int, "Page number (starts from 0)"],
@@ -268,7 +290,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Update existing patient profile. Use when correcting or adding patient details."
+        description="Update existing patient profile. Use when correcting or adding patient details.",
+        tags={"patient", "write", "update"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
     )
     async def update_patient(
         patient_id: Annotated[str, "Unique identifier of the patient to update"],
@@ -311,7 +338,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Archive a patient profile. Use to hide/remove patient profiles."
+        description="Archive a patient profile. Use to hide/remove patient profiles.",
+        tags={"patient", "write", "delete", "archive"},
+        annotations=ToolAnnotations(
+            openWorldHint=False
+            # destructiveHint defaults to True for non-readonly operations
+        )
     )
     async def archive_patient(
         patient_id: Annotated[str, "Unique identifier of the patient to archive"],
@@ -346,7 +378,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-            description=" Find patient by mobile number. Use this when user provides mobile. Fast and exact match."
+        description="Find patient by mobile number. Use this when user provides mobile. Fast and exact match.",
+        tags={"patient", "read", "search", "mobile"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],

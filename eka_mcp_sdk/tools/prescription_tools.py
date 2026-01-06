@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 def register_prescription_tools(mcp: FastMCP) -> None:
     """Register Prescription Management MCP tools."""
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+    )
     async def get_prescription_details_basic(
         prescription_id: str,
         ctx: Context = CurrentContext()
@@ -54,7 +56,9 @@ def register_prescription_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+    )
     async def get_comprehensive_prescription_details(
         prescription_id: str,
         include_patient_details: bool = True,

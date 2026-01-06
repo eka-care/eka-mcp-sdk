@@ -22,5 +22,5 @@ def register_doctor_tools(mcp: FastMCP) -> None:
     register_patient_tools(mcp)
     register_appointment_tools(mcp)
     register_doctor_clinic_tools(mcp)
-    # register_prescription_tools(mcp)
+    register_prescription_tools(mcp)
     # register_assessment_tools(mcp)

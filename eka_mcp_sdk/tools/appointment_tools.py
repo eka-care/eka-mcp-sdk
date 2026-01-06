@@ -5,6 +5,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
+from mcp.types import ToolAnnotations
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
@@ -24,7 +25,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
-        description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking."
+        description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking.",
+        tags={"appointment", "read", "slots", "availability"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def get_appointment_slots(
         doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
@@ -37,8 +43,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Check slot availability.
         
         ⚠️ Limit: D to D+1 only (today to tomorrow)
-        Example: "2025-12-30" to "2025-12-31" ✅
-                 "2025-12-30" to "2026-01-02" ❌
+        Example: "2025-12-30" to "2025-12-31" - right
+                 "2025-12-30" to "2026-01-02" - wrong
         
         Time hints:
         - "noon" → Check 12:00-13:00
@@ -78,7 +84,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="🌟 Book appointment for a patient. Need: patient_id, doctor_id, clinic_id, date, time. Check slots first recommended."
+        description="Book appointment for a patient. Need: patient_id, doctor_id, clinic_id, date, time. Check slots first recommended.",
+        tags={"appointment", "write", "book", "create"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
     )
     async def book_appointment(
         booking: Annotated[
@@ -174,7 +185,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both)."
+        description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
+        tags={"appointment", "read", "list", "enriched"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
     )
     async def get_appointments_enriched(
         patient_id: Annotated[Optional[str], "Filter by patient (cannot use with dates)"] = None,
@@ -239,7 +255,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        tags={"appointment", "read", "list", "basic"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
+    )
     async def get_appointments_basic(
         doctor_id: Optional[str] = None,
         clinic_id: Optional[str] = None,
@@ -296,7 +318,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,   
+        tags={"appointment", "read", "details", "enriched"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
+    )
     async def get_appointment_details_enriched(
         appointment_id: str,
         partner_id: Optional[str] = None,
@@ -337,7 +366,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "details", "basic"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
+    )
     async def get_appointment_details_basic(
         appointment_id: str,
         partner_id: Optional[str] = None,
@@ -378,7 +414,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "patient", "list", "enriched"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
+    )
     async def get_patient_appointments_enriched(
         patient_id: str,
         limit: Optional[int] = None,
@@ -425,7 +468,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "patient", "list", "basic"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            openWorldHint=False
+        )
+    )
     async def get_patient_appointments_basic(
         patient_id: str,
         limit: Optional[int] = None,
@@ -467,7 +517,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "write", "update"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
+    )
     async def update_appointment(
         appointment_id: str,
         update_data: Dict[str, Any],
@@ -507,7 +564,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        tags={"appointment", "write", "complete", "status"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
+    )
     async def complete_appointment(
         appointment_id: str,
         completion_data: Dict[str, Any],
@@ -545,7 +608,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        tags={"appointment", "write", "cancel", "destructive"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=True
+        )
+    )
     async def cancel_appointment(
         appointment_id: str,
         cancel_data: Dict[str, Any],
@@ -583,7 +652,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
-    @mcp.tool()
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "write", "reschedule"},
+        annotations=ToolAnnotations(
+            openWorldHint=False,
+            destructiveHint=False
+        )
+    )
     async def reschedule_appointment(
         appointment_id: str,
         reschedule_data: Dict[str, Any],
