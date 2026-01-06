@@ -32,11 +32,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Search patients by prefix (workspace-specific feature).
+        Search for patients within the current workspace using a text prefix.
+        The prefix is matched against patient username, mobile number, or full name.
+
+        Recommended Usage
+        Use this tool when implementing autocomplete, quick search, or typeahead
+        functionality where users need to find patients by partial input.
+        This tool is workspace-scoped and optimized for prefix-based searches.
         
         For general patient lookup, use:
         - list_patients: View all patients with pagination
         - get_patient_by_mobile: Find by exact mobile number
+
+        Trigger Keywords
+        search patient, patient search, find patient, quick patient search
+
+        Returns dict with success (bool) and data (dict) #CHANGE
+        
         """
         await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
         await ctx.debug(f"Search parameters - limit: {limit}, select: {select}")
@@ -69,7 +81,23 @@ def register_patient_tools(mcp: FastMCP) -> None:
         patient_id: Annotated[str, "Patient's unique identifier"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Returns basic patient profile including personal and medical information only."""
+        """
+        Fetches basic patient profile details using patient profile ID.
+
+        Recommended Usage:
+        Use when you only need core patient profile information (demographics and limited medical data) tied to a known profile ID. 
+        For full clinical, encounter, or longitudinal data => prefer get_comprehensive_patient_profile.
+
+        Trigger Keywords:
+        get patient details, fetch patient profile, lookup patient by profile id
+        retrieve basic patient information
+
+        What to Return:
+        Returns a JSON object with two fields
+        -success: True if successful, False otherwise
+        -data: Patient profile details
+
+        """
         await ctx.info(f"[get_patient_details_basic] Getting basic patient details for: {patient_id}")
         
         try:
@@ -150,15 +178,22 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
         ) -> Dict[str, Any]:
         """
-        Create patient profile.
+        Creates a new patient profile and returns a unique patient identifier.
+
+        Recommended Usage:
+        Use when registering a new patient profile with basic demographic information.
+        Do not use to update existing patients or modify partial profile data.
         
-        Required: fln, dob, gen
-        Optional: mobile, email, address
-        
-        Example: {"fln": "John Doe", "dob": "1990-01-15", "gen": "M", "mobile": "+919876543210"}
-        
-        Returns: Patient with oid (patient_id)
+        Trigger Keywords:
+        create patient, add patient profile, register new patient, 
+        new patient registration, create patient record
+
+        What to Return:
+        Returns a JSON object with:
+        - success: boolean indicating whether patient creation succeeded
+        - data: an object containing the created patient profile, including the unique patient ID (oid)
         """
+
         await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
         
