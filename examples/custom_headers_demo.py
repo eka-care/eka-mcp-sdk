@@ -14,7 +14,7 @@ Setup:
 import asyncio
 import logging
 from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
-from eka_mcp_sdk.config.settings import settings
+from eka_mcp_sdk.config.settings import EkaSettings
 
 # Configure logging to see headers in debug mode
 logging.basicConfig(level=logging.INFO)
@@ -172,6 +172,7 @@ async def main():
     print("🏥 Eka.care MCP SDK - Custom Headers Demo")
     print("="*60)
     
+    settings = EkaSettings()
     if not settings.client_id:
         print("ℹ️  Note: No authentication configured. API calls will show authentication errors,")
         print("   but custom headers functionality will be demonstrated.")

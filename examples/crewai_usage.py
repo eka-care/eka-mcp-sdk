@@ -19,7 +19,7 @@ Dependencies:
 
 import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
 try:
@@ -31,7 +31,7 @@ except ImportError:
 
 from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.auth.models import EkaAPIError
-from eka_mcp_sdk.config.settings import settings
+from eka_mcp_sdk.config.settings import EkaSettings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 class EkaCareBaseTool(BaseTool):
     """Base tool class for Eka.care API integrations with CrewAI."""
+    client: Optional[EkaEMRClient] = None
     
     def __init__(self):
         super().__init__()
@@ -224,6 +225,7 @@ async def demo_healthcare_workflow():
     print("="*60)
     
     # Verify configuration
+    settings = EkaSettings()
     if not settings.client_id:
         print("❌ Missing EKA_CLIENT_ID in configuration")
         return
@@ -371,6 +373,7 @@ async def main():
         return
     
     # Check configuration
+    settings = EkaSettings()
     if not settings.client_id:
         print("⚠️  EKA_CLIENT_ID not configured. Please update your .env file.")
         return

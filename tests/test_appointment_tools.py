@@ -60,6 +60,8 @@ class TestRunner:
         self.test_doctor_id: Optional[str] = None
         self.test_clinic_id: Optional[str] = None
         self.test_patient_id: Optional[str] = None
+        self.test_cancellation_appointment_id: Optional[str] = None
+        self.test_reschedule_appointment_id: Optional[str] = None
         
     async def setup(self):
         """Initialize client and service"""
@@ -231,19 +233,25 @@ async def test_list_appointments(*args, **kwargs):
             
             # Store IDs from first appointment for other tests
             # Prefer an appointment with patient_details (indicates valid patient)
+            selected_appts = []
             selected_appt = None
             for appt in appointments:
                 if appt.get("patient_details"):
-                    selected_appt = appt
-                    break
-            if not selected_appt and appointments:
-                selected_appt = appointments[0]
+                    selected_appts.append(appt)
+            if len(selected_appts) < 3 and appointments:
+                for appt in appointments:
+                    selected_appts.append(appt)
             
-            if selected_appt:
+            if len(selected_appts):
+                selected_appt = selected_appts[0]
                 r.test_appointment_id = selected_appt.get("appointment_id")
                 r.test_doctor_id = selected_appt.get("doctor_id")
                 r.test_clinic_id = selected_appt.get("clinic_id")
                 r.test_patient_id = selected_appt.get("patient_id")
+                if len(selected_appts) > 1:
+                    r.test_cancellation_appointment_id = selected_appts[1].get("appointment_id")
+                if len(selected_appts) > 2:
+                    r.test_reschedule_appointment_id = selected_appts[2].get("appointment_id")
                 
                 print(f"   ℹ️  Stored IDs for subsequent tests:")
                 if r.test_appointment_id:
@@ -254,6 +262,10 @@ async def test_list_appointments(*args, **kwargs):
                     print(f"      - Clinic ID: {r.test_clinic_id}")
                 if r.test_patient_id:
                     print(f"      - Patient ID: {r.test_patient_id}")
+                if r.test_appointment_id:
+                    print(f"      - Cancellation Appointment ID: {r.test_cancellation_appointment_id}")
+                if r.test_appointment_id:
+                    print(f"      - Reschedule Appointment ID: {r.test_reschedule_appointment_id}")
         
         return result
         
@@ -497,15 +509,16 @@ async def test_complete_appointment(*args, **kwargs):
     await r.setup()
     
     appointment_id = kwargs.get("appointment_id", r.test_appointment_id)
+    completion_data = kwargs.get("completion_data", {})
     
     if not appointment_id:
         print("   ⚠️  No appointment ID available, skipping test")
         return None
     
-    r.log_request("complete_appointment", appointment_id=appointment_id)
+    r.log_request("complete_appointment", appointment_id=appointment_id, completion_data=completion_data)
     
     try:
-        result = await r.service.complete_appointment(appointment_id=appointment_id)
+        result = await r.service.complete_appointment(appointment_id=appointment_id, completion_data=completion_data)
         
         # Get curl command from client
         curl_cmd = r.client.last_curl_command if r.client else None
@@ -531,17 +544,17 @@ async def test_cancel_appointment(*args, **kwargs):
     r = get_runner()
     await r.setup()
     
-    appointment_id = kwargs.get("appointment_id", r.test_appointment_id)
-    reason = kwargs.get("reason", "Test cancellation")
+    appointment_id = kwargs.get("appointment_id", r.test_cancellation_appointment_id)
+    cancel_data = kwargs.get("cancel_data", { "reason": "Test", "notes": "Testing" })
     
     if not appointment_id:
         print("   ⚠️  No appointment ID available, skipping test")
         return None
     
-    r.log_request("cancel_appointment", appointment_id=appointment_id, reason=reason)
+    r.log_request("cancel_appointment", appointment_id=appointment_id, cancel_data=cancel_data)
     
     try:
-        result = await r.service.cancel_appointment(appointment_id=appointment_id, reason=reason)
+        result = await r.service.cancel_appointment(appointment_id=appointment_id, cancel_data=cancel_data)
         
         # Get curl command from client
         curl_cmd = r.client.last_curl_command if r.client else None
@@ -567,22 +580,56 @@ async def test_reschedule_appointment(*args, **kwargs):
     r = get_runner()
     await r.setup()
     
-    appointment_id = kwargs.get("appointment_id", r.test_appointment_id)
-    reschedule_data = kwargs.get("reschedule_data", {
-        "date": (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d"),
-        "start_time": "14:00",
-        "end_time": "14:30",
-        "reason": "Test rescheduling"
+    appointment_id = kwargs.get("appointment_id", r.test_reschedule_appointment_id)
+    doctor_id = kwargs.get("doctor_id", r.test_doctor_id)
+    clinic_id = kwargs.get("clinic_id", r.test_clinic_id)
+    patient_id = kwargs.get("patient_id", r.test_patient_id)
+
+    # Calculate appointment time (2 days from now, 5:00 PM)
+    appointment_date = datetime.now() + timedelta(days=2)
+    appointment_date = appointment_date.replace(hour=17, minute=0, second=0, microsecond=0)
+    start_timestamp = int(appointment_date.timestamp())
+    end_timestamp = int((appointment_date + timedelta(minutes=30)).timestamp())
+
+
+    appointment_data = kwargs.get("appointment_data", {
+        "doctor_id": doctor_id,  # Use eka IDs, not partner IDs
+        "clinic_id": clinic_id,
+        "patient_id": patient_id,
+        "appointment_details": {
+            "start_time": start_timestamp,
+            "end_time": end_timestamp,
+            "mode": "INCLINIC"
+        },
+        "patient_details": {
+            "designation": "Mr.",
+            "first_name": "Test",
+            "middle_name": "",
+            "last_name": "Patient",
+            "mobile": "+919999999999",
+            "gender": "M",
+            "dob": "1990-01-01",  # Required field
+        }
     })
     
     if not appointment_id:
         print("   ⚠️  No appointment ID available, skipping test")
         return None
     
-    r.log_request("reschedule_appointment", appointment_id=appointment_id, reschedule_data=reschedule_data)
+    r.log_request("reschedule_appointment", appointment_id=appointment_id, reschedule_data=appointment_data)
     
     try:
-        result = await r.service.reschedule_appointment(appointment_id=appointment_id, reschedule_data=reschedule_data)
+        result = await r.service.cancel_appointment(appointment_id=appointment_id, cancel_data={})
+
+        # Get curl command from client
+        curl_cmd = r.client.last_curl_command if r.client else None
+        r.log_response({"success": True, "data": result}, curl_cmd=curl_cmd)
+
+        # Validation
+        assert result is not None, "Result should not be None"
+        print(f"   ✓ Cancelled appointment: {appointment_id}")
+
+        result = await r.service.book_appointment(appointment_data=appointment_data)
         
         # Get curl command from client
         curl_cmd = r.client.last_curl_command if r.client else None
@@ -590,7 +637,9 @@ async def test_reschedule_appointment(*args, **kwargs):
         
         # Validation
         assert result is not None, "Result should not be None"
-        print(f"   ✓ Rescheduled appointment: {appointment_id}")
+        if isinstance(result, dict):
+            appointment_id = result.get("appointment_id")
+            print(f"   ✓ Booked appointment (ID: {appointment_id})")
         
         return result
         
