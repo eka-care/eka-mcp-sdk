@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
-from mcp.types import ToolAnnotations
+from ..utils.fastmcp_helper import readonly_tool_annotations
 
 from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
@@ -21,10 +21,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         description="Get all doctors and clinics details for a business. Use this to find doctor_id and clinic_id by doctor name for bookings.",
         tags={"doctor", "clinic", "read", "list", "primary"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_business_entities(
         ctx: Context = CurrentContext()
@@ -67,10 +64,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         tags={"doctor", "read", "profile"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_doctor_profile_basic(
         doctor_id: str,
@@ -112,10 +106,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         tags={"clinic", "read", "profile"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_clinic_details_basic(
         clinic_id: str,
@@ -158,10 +149,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         enabled=False,
         tags={"doctor", "read", "services"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_doctor_services(
         doctor_id: str,
@@ -202,10 +190,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_doctor_profile(
         doctor_id: str,
@@ -255,10 +240,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
-        annotations=ToolAnnotations(
-            readOnlyHint=True,
-            openWorldHint=False
-        )
+        annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_clinic_profile(
         clinic_id: str,
