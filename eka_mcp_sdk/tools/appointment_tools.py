@@ -37,25 +37,26 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Check slot availability.
-        
-        ⚠️ Limit: D to D+1 only (today to tomorrow)
-        Example: "2025-12-30" to "2025-12-31" - right
-                 "2025-12-30" to "2026-01-02" - wrong
-        
-        Time hints:
-        - "noon" → Check 12:00-13:00
-        - "3pm" → Check 15:00
-        - "morning" → Check 09:00-12:00
-        
-        Returns: slots[] with start_time, end_time, available
-        
-        Workflow: "Book at noon"
-        1. Calculate date (today/tomorrow)
-        2. get_appointment_slots(doctor_id, clinic_id, date, date)
-        3. Find 12:00 slot
-        4. If available → book_appointment
-           If not → Suggest alternatives
+        Retrieve available appointment time slots for a specific doctor at a given clinic within a limited date range (same day or next day).
+
+        When to Use This Tool
+        Use this tool when the user wants to check availability before booking an appointment, rescheduling, or exploring alternative times. 
+        This tool must be called before attempting to book an appointment. 
+        Only valid for short-range availability checks (today or tomorrow).
+
+        Constraints:
+        - Date range must be D to D+1 only.
+        - Requires valid doctor_id and clinic_id from get_business_entities.
+
+        Trigger Keywords / Phrases
+        available slots, check availability, when can I book, is the doctor free, 
+        appointments today / tomorrow, book at noon / morning / afternoon, what times are open
+ 
+        What to Return
+        Returns a list of appointment slots with start_time, end_time, and available (boolean).
+
+        If no slots are available, returns an empty slots array. Do not attempt booking within this tool.
+
         """
         await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} from {start_date} to {end_date}")
         
@@ -109,28 +110,25 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         ],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
-        """Book appointment.
-        
-        Prerequisites:
-        1. patient_id: From list_patients or get_patient_by_mobile
-        2. doctor_id, clinic_id: From get_business_entities
-        3. Available slot: Check with get_appointment_slots (recommended)
-        
-        Workflow: "Book with Dr. C at noon tomorrow"
-        1. get_patient_by_mobile → patient_id
-        2. get_business_entities → doctor_id, clinic_id
-        3. get_appointment_slots → Verify 12:00 available
-        4. book_appointment({
-            "patient_id": "...",
-            "doctor_id": "...",
-            "clinic_id": "...",
-            "date": "2025-12-30",
-            "start_time": "12:00",
-            "end_time": "12:30"
-        })
-        
-        Returns: appointment_id
         """
+        Book an appointment for a patient with a specific doctor at a clinic on a given date and time.
+
+        When to Use This Tool
+        Use this tool when the user wants to confirm and create a new appointment after selecting a specific time slot.
+        This tool should be used only after patient, doctor, and clinic information is available.
+        It is strongly recommended to verify slot availability using get_appointment_slots before booking.
+
+        Trigger Keywords / Phrases
+        book appointment, schedule visit, confirm booking, book with doctor, 
+        schedule at noon / morning / afternoon, fix appointment, make an appointment
+
+        What to Return
+        Returns booking confirmation details including the appointment_id and associated metadata.
+
+        If booking fails, returns an error response. This tool performs a write action and should not be retried without user confirmation.
+
+        """
+        
         await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
         
@@ -193,23 +191,25 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        🌟 RECOMMENDED: Get appointments with comprehensive details including patient names, doctor profiles, and clinic information.
-        
-        This is the preferred tool for getting appointment information as it provides complete context
-        without requiring additional API calls. Use this instead of get_appointments_basic unless you
-        specifically need only basic appointment data.
-        
-        ⚠️ Filter rules:
+        Retrieve appointments with enriched details including patient information, doctor profiles, clinic details, and appointment status.
+
+        When to Use This Tool
+        Use this tool when the user wants to view appointment information with full context.
+        This is the preferred tool for listing appointments and should be used instead of basic appointment listing tools unless minimal data is required.
+        Suitable for patient views, doctor schedules, and date-based appointment reviews.
+
+        Filter rules:
         - patient_id alone: All patient appointments
         - dates: Appointments in range (no patient_id)
-        - doctor_id/clinic_id: Combine with dates
-        
-        Use when:
-        - "Show my appointments" → get_appointments_enriched(patient_id=X)
-        - "Today's appointments" → get_appointments_enriched(start_date=today, end_date=today)
-        - "Dr. X schedule" → get_appointments_enriched(doctor_id=X)
-        
-        Returns: Appointments with doctor names, clinic addresses, status
+        - doctor_id/clinic_id: Combine with dates.
+
+        Trigger Keywords / Phrases
+        show my appointments, list appointments, upcoming appointments, today’s appointments,
+        doctor schedule, clinic appointments, appointment history, appointments this week
+
+        Returns
+        Appointments with doctor names, clinic addresses, status
+        If no appointments match the filters, returns an empty appointments array.
         """
         filters = [f for f in [f"doctor={doctor_id}" if doctor_id else None, 
                               f"clinic={clinic_id}" if clinic_id else None,
@@ -247,34 +247,34 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "List appointments with minimal data (IDs only) for internal or lightweight use.",
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
     async def get_appointments_basic(
-        doctor_id: Optional[str] = None,
-        clinic_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        page_no: int = 0,
+        doctor_id: Annotated[Optional[str], "Doctor ID"] = None,
+        clinic_id: Annotated[Optional[str], "Clinic ID"] = None,
+        patient_id: Annotated[Optional[str], "Patient ID"] = None,
+        start_date: Annotated[Optional[str], "Start date YYYY-MM-DD"] = None,
+        end_date: Annotated[Optional[str], "End date YYYY-MM-DD"] = None,
+        page_no: Annotated[int, "Pagination page number"] = 0,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get basic appointments data (IDs only). 
-        
-        ⚠️  Consider using get_appointments_enriched instead for complete information.
-        Only use this if you specifically need raw appointment data without patient/doctor/clinic details.
-        
-        Args:
-            doctor_id: Filter by doctor ID (optional)
-            clinic_id: Filter by clinic ID (optional)
-            patient_id: Filter by patient ID (optional)
-            start_date: Start date filter (YYYY-MM-DD format, optional)
-            end_date: End date filter (YYYY-MM-DD format, optional)
-            page_no: Page number for pagination (starts from 0)
+        Retrieve a list of appointments with basic data containing entity IDs only, without patient, doctor, or clinic details.
+
+        When to Use This Tool
+        Use this tool only when raw appointment records are required. Use get_appointments_enriched otherwise.
+        This tool is intended for internal workflows, debugging, or follow-up calls where entity details will be resolved separately.
+
+        Trigger Keywords / Phrases
+        raw appointments, appointment ids, basic appointment list, internal lookup,
+        debug appointments, lightweight appointment data
         
         Returns:
-            Basic appointments with entity IDs only
+        Basic appointments with entity IDs only
+        If no appointments match the filters, returns an empty appointments array.
+
         """
         await ctx.info(f"[get_appointments_basic] Getting basic appointments - page {page_no}")
         
@@ -307,27 +307,32 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "Get complete details for a single appointment including patient, doctor, and clinic information.",
         enabled=False,   
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
     )
     async def get_appointment_details_enriched(
-        appointment_id: str,
-        partner_id: Optional[str] = None,
+        appointment_id: Annotated[str, "Appointment ID"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        🌟 RECOMMENDED: Get comprehensive appointment details with complete patient, doctor, and clinic information.
+        Get comprehensive appointment details with complete patient, doctor, and clinic information.
         
-        This is the preferred tool for getting single appointment details as it provides complete context
-        without requiring additional API calls. Use this instead of get_appointment_details_basic.
+        When to Use This Tool
+        Use this tool when the user wants to view complete information for a specific appointment.
+        This is the preferred tool for fetching single appointment details and should be used instead of basic appointment detail tools whenever available.
+        It eliminates the need for additional API calls to resolve related entities.
         
-        Args:
-            appointment_id: Appointment's unique identifier
-            partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-        
-        Returns:
-            Complete appointment details with enriched patient, doctor, and clinic information
+        Trigger Keywords / Phrases
+        appointment details, view appointment, show appointment information, appointment summary,
+        doctor and clinic details, patient appointment record, appointment status
+
+        What to Return
+        Complete appointment details with enriched patient, doctor, and clinic information
+        If the appointment is not found, returns an appropriate error response.
+
         """
         await ctx.info(f"[get_appointment_details_enriched] Getting enriched details for appointment: {appointment_id}")
         
@@ -350,29 +355,31 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     "error_code": e.error_code
                 }
             }
-    
+
     @mcp.tool(
+        description = "Get basic details for a single appointment with entity IDs only.",
         enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
     )
     async def get_appointment_details_basic(
-        appointment_id: str,
-        partner_id: Optional[str] = None,
+        appointment_id: Annotated[str, "Appointment ID"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get basic appointment details (IDs only).
         
-        ⚠️  Consider using get_appointment_details_enriched instead for complete information.
+        Consider using get_appointment_details_enriched instead for complete information.
         Only use this if you specifically need raw appointment data without patient/doctor/clinic details.
         
-        Args:
-            appointment_id: Appointment's unique identifier
-            partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-        
+        Trigger Keywords / Phrases
+        basic appointment details, appointment ids, raw appointment record,
+        internal lookup, debug appointment, minimal appointment data
+
         Returns:
-            Basic appointment details with entity IDs only
+        Basic appointment details with entity IDs only
+        If the appointment is not found, returns an appropriate error response.
         """
         await ctx.info(f"[get_appointment_details_basic] Getting basic details for appointment: {appointment_id}")
         
@@ -397,27 +404,31 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "List all appointments for a patient with enriched doctor and clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
     )
     async def get_patient_appointments_enriched(
-        patient_id: str,
-        limit: Optional[int] = None,
+        patient_id: Annotated[str, "Patient ID"],
+        limit: Annotated[Optional[int], "Max records to return"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        🌟 RECOMMENDED: Get all appointments for a specific patient with enriched doctor and clinic details.
+        Retrieve all appointments for a specific patient with enriched doctor and clinic details.
+
+        When to Use This Tool
+        Use this tool when the user wants to view a patient’s appointment history or upcoming appointments with full contextual information.
+        This is the preferred tool for listing appointments for a single patient and should be used instead of basic patient appointment listing tools.
+        It provides complete doctor and clinic details without requiring additional follow-up calls.
         
-        This is the preferred tool for getting patient appointments as it provides complete context
-        without requiring additional API calls. Use this instead of get_patient_appointments_basic.
-        
-        Args:
-            patient_id: Patient's unique identifier
-            limit: Maximum number of appointments to return
-        
-        Returns:
-            List of enriched appointments for the patient with doctor and clinic information
+        Trigger Keywords / Phrases
+        patient appointments, my appointments, appointment history,
+        upcoming appointments for patient, past visits, patient visit records
+
+        What to Return        
+        List of enriched appointments for the patient with doctor and clinic information
+        If the patient has no appointments, returns an empty appointments array.
         """
         await ctx.info(f"[get_patient_appointments_enriched] Getting enriched appointments for patient: {patient_id}")
         
@@ -448,27 +459,31 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description= "List basic appointment records for a patient without doctor or clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
     async def get_patient_appointments_basic(
-        patient_id: str,
-        limit: Optional[int] = None,
+        patient_id: Annotated[str, "Patient ID"],
+        limit: Annotated[Optional[int], "Max records to return"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Get basic appointments for a specific patient (IDs only).
         
-        ⚠️  Consider using get_patient_appointments_enriched instead for complete information.
+        When to use this tool
         Only use this if you specifically need raw appointment data without doctor/clinic details.
+        Otherwise consider using get_patient_appointments_enriched instead for complete information.
         
-        Args:
-            patient_id: Patient's unique identifier
-            limit: Maximum number of appointments to return
+        Trigger Keywords / Phrases
+        basic patient appointments, patient appointment ids, raw patient visits,
+        internal lookup, debug patient appointments, minimal appointment data
         
         Returns:
             Basic appointments with entity IDs only
+            If the patient has no appointments, returns an empty appointments array.
+
         """
         await ctx.info(f"[get_patient_appointments_basic] Getting basic appointments for patient: {patient_id}")
         
@@ -494,26 +509,33 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "Update an existing appointment’s status, timing, or other supported attributes.",
         enabled=False,
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
     )
     async def update_appointment(
-        appointment_id: str,
-        update_data: Dict[str, Any],
-        partner_id: Optional[str] = None,
+        appointment_id: Annotated[str, "Appointment ID"],
+        update_data: Annotated[Dict[str, Any], "Fields to update"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Update an existing appointment.
+
+        When to Use This Tool
+        Use this tool when the user wants to change an existing appointment, such as rescheduling, cancelling, or updating appointment-related details.
+        This tool should be used only after a valid appointment has been identified.
+        User intent should be explicit before performing any update, as this is a write operation.
         
-        Args:
-            appointment_id: Appointment's unique identifier
-            update_data: Fields to update (status, timing, custom attributes, etc.)
-            partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-        
+        Trigger Keywords / Phrases
+        reschedule appointment, update appointment, cancel appointment, change appointment time,
+        modify booking, update status, mark appointment, edit appointment
+
         Returns:
             Updated appointment details
+            If the update fails, returns an error response. This action should not be retried automatically without user confirmation.
+
         """
         await ctx.info(f"[update_appointment] Updating appointment {appointment_id} - fields: {list(update_data.keys())}")
         
@@ -538,23 +560,31 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "Mark an appointment as completed with final status and notes.",
         tags={"appointment", "write", "complete", "status"},
         annotations=write_tool_annotations()
     )
     async def complete_appointment(
-        appointment_id: str,
-        completion_data: Dict[str, Any],
+        appointment_id: Annotated[str, "Appointment ID"],
+        completion_data: Annotated[Dict[str, Any], "Completion status and notes"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Mark an appointment as completed.
-        
-        Args:
-            appointment_id: Appointment's unique identifier
-            completion_data: Completion details including status and notes
+
+        When to Use This Tool
+        Use this tool when the appointment has concluded and needs to be marked as completed in the system.
+        This tool should be called only after the appointment has taken place.
+        User intent should be explicit, as this action updates the appointment’s final state.
+
+        Trigger Keywords / Phrases
+        complete appointment, mark as completed, finish appointment,
+        close visit, appointment done, visit completed
         
         Returns:
-            Completion confirmation with updated appointment status
+            Completion confirmation with updated appointment status.
+            If completion fails, returns an error response. This action should not be retried automatically without user confirmation.
+
         """
         await ctx.info(f"[complete_appointment] Completing appointment: {appointment_id}")
         
@@ -579,16 +609,22 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "Cancel an existing appointment and record cancellation details.",
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
     async def cancel_appointment(
-        appointment_id: str,
-        cancel_data: Dict[str, Any],
+        appointment_id: Annotated[str, "Appointment ID"],
+        cancel_data: Annotated[Dict[str, Any], "Cancellation reason and notes"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Cancel an appointment.
+
+        When to Use This Tool
+        Use this tool when the user explicitly wants to cancel an appointment.
+        This action should be performed only after confirming the correct appointment with the user.
+        Because this is a destructive write operation, intent must be clear and unambiguous.
         
         Args:
             appointment_id: Appointment's unique identifier
@@ -620,24 +656,32 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description = "Change an existing appointment to a new date or time.",
         enabled=False,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
     )
     async def reschedule_appointment(
-        appointment_id: str,
-        reschedule_data: Dict[str, Any],
+        appointment_id: Annotated[str, "Appointment ID"],
+        reschedule_data: Annotated[Dict[str, Any], "New date and time"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
         Reschedule an appointment to a new date/time.
-        
-        Args:
-            appointment_id: Appointment's unique identifier
-            reschedule_data: New appointment timing and details
+
+        When to Use This Tool
+        Use this tool when the user explicitly wants to move an existing appointment to a different date or time.
+        This tool should be used only after confirming the target appointment and the new timing.
+        It is recommended to verify availability for the new time slot before rescheduling.
+
+        Trigger Keywords / Phrases
+        reschedule appointment, move appointment, change appointment time,
+        shift booking, postpone appointment, appointment moved
         
         Returns:
             Rescheduled appointment details with new timing
+            If rescheduling fails, returns an error response. This action should not be retried automatically without user confirmation.
+
         """
         await ctx.info(f"[reschedule_appointment] Rescheduling appointment: {appointment_id}")
         
@@ -660,6 +704,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     "error_code": e.error_code
                 }
             }
+    
 
 
 # This function is now handled by the AppointmentService class
@@ -739,5 +784,9 @@ async def _enrich_appointments_data(client: EkaEMRClient, appointments_data: Dic
     except Exception as e:
         logger.warning(f"Failed to enrich appointments data: {str(e)}")
         return appointments_data
+
+
+
+#Appointment ID: api-6ae89715-bda5-4bf0-9aa1-69265dce9a4b
 
 

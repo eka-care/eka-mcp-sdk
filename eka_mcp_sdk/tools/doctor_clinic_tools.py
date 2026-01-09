@@ -27,16 +27,18 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get all doctors and clinics in workspace.
-        
-        Use when:
-        - "Book with Dr. X" → Find doctor by name
-        - "Which doctors available?" → List all
-        - Need doctor_id/clinic_id
-        
-        Returns:
-        - doctors[]: doctor_id, name, specialization
-        - clinics[]: clinic_id, name, doctors[]
+        Retrieve all doctors and clinics associated with the business workspace.
+
+        When to Use This Tool
+        Use this tool when the user references a doctor or clinic by name and IDs are required for downstream actions.
+        This is typically the first step before booking appointments or checking availability.
+
+        Trigger Keywords / Phrases
+        list doctors, available doctors, clinics list, book with doctor,
+        find doctor id, find clinic id, doctor names
+
+        What to Return
+        Returns a structured list of doctors and clinics with their identifiers and associations.
         """
         await ctx.info(f"[get_business_entities] Getting business entities (clinics and doctors)")
         
@@ -63,24 +65,26 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="Get basic profile information for a doctor.",
         tags={"doctor", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
     async def get_doctor_profile_basic(
-        doctor_id: str,
+        doctor_id: Annotated[str, "Doctor UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get basic doctor profile information (profile data only).
-        
-        ⚠️  Consider using get_comprehensive_doctor_profile instead for complete information.
-        Only use this if you specifically need basic doctor data without clinic associations and appointments.
-        
-        Args:
-            doctor_id: Doctor's unique identifier
-        
-        Returns:
-            Basic doctor profile including specialties, contact info, and background only
+        Retrieve basic profile information for a doctor without clinic or appointment context.
+
+        When to Use This Tool
+        Use this tool when only standalone doctor details are needed, such as specialization or background.
+        For richer context including clinics and appointments, use get_comprehensive_doctor_profile instead.
+
+        Trigger Keywords / Phrases
+        doctor profile, doctor details, doctor information, doctor specialization
+
+        What to Return
+        Returns basic doctor profile data without clinic associations or appointment history.
         """
         await ctx.info(f"[get_doctor_profile_basic] Getting basic doctor profile for: {doctor_id}")
         
@@ -105,24 +109,26 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="Get basic profile information for a clinic.",
         tags={"clinic", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
     async def get_clinic_details_basic(
-        clinic_id: str,
+        clinic_id: Annotated[str, "Clinic UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get basic information about a clinic (clinic data only).
-        
-        ⚠️  Consider using get_comprehensive_clinic_profile instead for complete information.
-        Only use this if you specifically need basic clinic data without doctor associations and appointments.
-        
-        Args:
-            clinic_id: Clinic's unique identifier
-        
-        Returns:
-            Basic clinic details including address, facilities, and services only
+        Retrieve basic profile information for a clinic without doctor or appointment context.
+
+        When to Use This Tool
+        Use this tool when only clinic-level details such as address or facilities are required.
+        For full clinic context including doctors and appointments, use get_comprehensive_clinic_profile.
+
+        Trigger Keywords / Phrases
+        clinic details, clinic information, clinic address, clinic profile
+
+        What to Return
+        Returns basic clinic profile data without doctor associations or appointment history.
         """
         await ctx.info(f"[get_clinic_details_basic] Getting basic clinic details for: {clinic_id}")
         
@@ -147,22 +153,27 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="List services and specialties offered by a doctor.",
         enabled=False,
         tags={"doctor", "read", "services"},
         annotations=readonly_tool_annotations()
     )
     async def get_doctor_services(
-        doctor_id: str,
+        doctor_id: Annotated[str, "Doctor UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get services offered by a doctor.
-        
-        Args:
-            doctor_id: Doctor's unique identifier
-        
-        Returns:
-            List of services and specialties offered by the doctor
+        Retrieve the list of services and specialties offered by a specific doctor.
+
+        When to Use This Tool
+        Use this tool when the user wants to know what treatments or services a doctor provides.
+        This is useful for service-based discovery or filtering.
+
+        Trigger Keywords / Phrases
+        doctor services, treatments offered, doctor specialties, services by doctor
+
+        What to Return
+        Returns a list of services and specialties associated with the doctor.
         """
         await ctx.info(f"[get_doctor_services] Getting services for doctor: {doctor_id}")
         
@@ -188,30 +199,35 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="Get a full doctor profile including clinics, services, and recent appointments.",
         enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_doctor_profile(
-        doctor_id: str,
-        include_clinics: bool = True,
-        include_services: bool = True,
-        include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10,
+        doctor_id: Annotated[str, "Doctor UUID"],
+        include_clinics: Annotated[bool, "Include clinic associations"] = True,
+        include_services: Annotated[bool, "Include doctor services"] = True,
+        include_recent_appointments: Annotated[bool, "Include recent appointments"] = True,
+        appointment_limit: Annotated[Optional[int], "Max recent appointments"] = 10,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get comprehensive doctor profile including associated clinics, services, and recent appointments.
-        
-        Args:
-            doctor_id: Doctor's unique identifier
-            include_clinics: Whether to include associated clinic details (default: True)
-            include_services: Whether to include doctor services (default: True)
-            include_recent_appointments: Whether to include recent appointments (default: True)
-            appointment_limit: Limit number of recent appointments (default: 10)
-        
-        Returns:
-            Complete doctor profile with enriched clinic details, services, and appointment history
+        Retrieve a comprehensive doctor profile including clinics, services, and recent appointments.
+
+        When to Use This Tool
+        Use this tool when a complete view of a doctor is required, including where they practice,
+        what services they offer, and recent appointment activity.
+
+        Constraints:
+        - Appointment history is limited by appointment_limit.
+
+        Trigger Keywords / Phrases
+        full doctor profile, doctor overview, doctor with clinics,
+        doctor appointment history, complete doctor details
+
+        What to Return
+        Returns a fully enriched doctor profile with optional clinic, service, and appointment data.
         """
         await ctx.info(f"[get_comprehensive_doctor_profile] Getting comprehensive profile for doctor: {doctor_id}")
         
@@ -238,30 +254,32 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="Get a full clinic profile including doctors, services, and recent appointments.",
         enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_clinic_profile(
-        clinic_id: str,
-        include_doctors: bool = True,
-        include_services: bool = True,
-        include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10,
+        clinic_id: Annotated[str, "Clinic ID"],
+        include_doctors: Annotated[bool, "Include associated doctors"] = True,
+        include_services: Annotated[bool, "Include clinic services"] = True,
+        include_recent_appointments: Annotated[bool, "Include recent appointments"] = True,
+        appointment_limit: Annotated[Optional[int], "Max recent appointments"] = 10,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Get comprehensive clinic profile including associated doctors, services, and recent appointments.
-        
-        Args:
-            clinic_id: Clinic's unique identifier
-            include_doctors: Whether to include associated doctor details (default: True)
-            include_services: Whether to include clinic services through doctors (default: True)
-            include_recent_appointments: Whether to include recent appointments (default: True)
-            appointment_limit: Limit number of recent appointments (default: 10)
-        
-        Returns:
-            Complete clinic profile with enriched doctor details, services, and appointment history
+        Retrieve a comprehensive clinic profile including doctors, services, and recent appointments.
+
+        When to Use This Tool
+        Use this tool when a full operational view of a clinic is required, including associated doctors
+        and recent appointment activity.
+
+        Trigger Keywords / Phrases
+        clinic profile, clinic overview, doctors at clinic,
+        clinic services, clinic appointment history
+
+        What to Return
+        Returns a fully enriched clinic profile with optional doctor, service, and appointment data.
         """
         await ctx.info(f"[get_comprehensive_clinic_profile] Getting comprehensive profile for clinic: {clinic_id}")
         
