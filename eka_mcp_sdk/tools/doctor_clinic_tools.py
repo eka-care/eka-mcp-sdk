@@ -70,7 +70,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         annotations=readonly_tool_annotations()
     )
     async def get_doctor_profile_basic(
-        doctor_id: str,
+        doctor_id: Annotated[str, "Doctor UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -114,7 +114,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         annotations=readonly_tool_annotations()
     )
     async def get_clinic_details_basic(
-        clinic_id: str,
+        clinic_id: Annotated[str, "Clinic UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -154,12 +154,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         description="List services and specialties offered by a doctor.",
-        #enabled=False,
+        enabled=False,
         tags={"doctor", "read", "services"},
         annotations=readonly_tool_annotations()
     )
     async def get_doctor_services(
-        doctor_id: str,
+        doctor_id: Annotated[str, "Doctor UUID"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -200,16 +200,16 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         description="Get a full doctor profile including clinics, services, and recent appointments.",
-        #enabled=False,
+        enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_doctor_profile(
-        doctor_id: str,
-        include_clinics: bool = True,
-        include_services: bool = True,
-        include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10,
+        doctor_id: Annotated[str, "Doctor UUID"],
+        include_clinics: Annotated[bool, "Include clinic associations"] = True,
+        include_services: Annotated[bool, "Include doctor services"] = True,
+        include_recent_appointments: Annotated[bool, "Include recent appointments"] = True,
+        appointment_limit: Annotated[Optional[int], "Max recent appointments"] = 10,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -255,16 +255,16 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         description="Get a full clinic profile including doctors, services, and recent appointments.",
-        #enabled=False,
+        enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_clinic_profile(
-        clinic_id: str,
-        include_doctors: bool = True,
-        include_services: bool = True,
-        include_recent_appointments: bool = True,
-        appointment_limit: Optional[int] = 10,
+        clinic_id: Annotated[str, "Clinic ID"],
+        include_doctors: Annotated[bool, "Include associated doctors"] = True,
+        include_services: Annotated[bool, "Include clinic services"] = True,
+        include_recent_appointments: Annotated[bool, "Include recent appointments"] = True,
+        appointment_limit: Annotated[Optional[int], "Max recent appointments"] = 10,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -273,9 +273,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         When to Use This Tool
         Use this tool when a full operational view of a clinic is required, including associated doctors
         and recent appointment activity.
-
-        Constraints:
-        - Appointment history is limited by appointment_limit.
 
         Trigger Keywords / Phrases
         clinic profile, clinic overview, doctors at clinic,

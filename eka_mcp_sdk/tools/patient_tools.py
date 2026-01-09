@@ -25,7 +25,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile.",
-        #enabled=False,
+        enabled=False,
     )
     async def search_patients(
         prefix: Annotated[str, "Search prefix to match against patient profiles (username, mobile, or full name)"],
