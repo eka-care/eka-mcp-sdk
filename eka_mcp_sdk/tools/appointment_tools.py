@@ -663,7 +663,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     )
     async def reschedule_appointment(
         appointment_id: Annotated[str, "Appointment ID"],
-    reschedule_data: Annotated[Dict[str, Any], "New date and time"],
+        reschedule_data: Annotated[Dict[str, Any], "New date and time"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
