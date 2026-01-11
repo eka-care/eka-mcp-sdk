@@ -19,6 +19,7 @@ class BaseEkaClient(ABC):
         self._auth_manager = AuthenticationManager(access_token)
         self._custom_headers = custom_headers or {}
         self.last_curl_command: Optional[str] = None
+        self.access_token = access_token
     
     async def _make_request(
         self,
@@ -31,18 +32,22 @@ class BaseEkaClient(ABC):
         # Get current settings and initialize url for exception handling
         settings = EkaSettings()
         url = f"{settings.api_base_url}{endpoint}"
+        headers = {}
         
         try:
-            # Get authentication context
-            auth_context = await self._auth_manager.get_auth_context()
-            
-            # Prepare request
-            headers = auth_context.auth_headers
-            
-            # Add client-id header for all API calls
             if not settings.client_id:
                 raise EkaAPIError("EKA_CLIENT_ID environment variable is required but not set")
+
             headers["client-id"] = settings.client_id
+
+            if self.access_token or self.client_secret:
+                # Get authentication context
+                auth_context = await self._auth_manager.get_auth_context()
+            
+                # Prepare request
+                headers = auth_context.auth_headers
+            
+            # Add client-id header for all API calls
             
             # Add instance custom headers
             if self._custom_headers:

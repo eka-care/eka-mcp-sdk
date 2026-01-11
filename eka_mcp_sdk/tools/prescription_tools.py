@@ -8,6 +8,7 @@ from fastmcp.server.context import Context
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.prescription_service import PrescriptionService
+from ..utils.tool_registration import get_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def register_prescription_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             prescription_service = PrescriptionService(client)
             result = await prescription_service.get_prescription_details_basic(prescription_id)
             
@@ -87,7 +88,7 @@ def register_prescription_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             prescription_service = PrescriptionService(client)
             result = await prescription_service.get_comprehensive_prescription_details(
                 prescription_id, include_patient_details, include_doctor_details, include_clinic_details

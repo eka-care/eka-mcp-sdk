@@ -11,6 +11,7 @@ from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
 from .models import AppointmentBookingRequest
+from ..utils.tool_registration import get_extra_headers
 from ..utils.enrichment_helpers import (
     get_cached_data,
     extract_patient_summary,
@@ -62,7 +63,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
             
@@ -157,7 +158,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             
             await ctx.debug(f"Constructed appointment data: {appointment_data}")
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.book_appointment(appointment_data)
             
@@ -220,7 +221,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointments_enriched(
                 doctor_id=doctor_id,
@@ -280,7 +281,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointments_basic(
                 doctor_id=doctor_id,
@@ -338,7 +339,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
             
@@ -385,7 +386,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
             
@@ -434,7 +435,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
             
@@ -444,7 +445,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             return {"success": True, "data": result}
         except EkaAPIError as e:
             await ctx.error(f"[get_patient_appointments_enriched] Failed: {e.message}\n")
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
             return {"success": True, "data": result}
@@ -489,7 +490,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
             
@@ -541,7 +542,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
             
@@ -590,7 +591,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.complete_appointment(appointment_id, completion_data)
             
@@ -637,7 +638,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
             
@@ -687,7 +688,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
             

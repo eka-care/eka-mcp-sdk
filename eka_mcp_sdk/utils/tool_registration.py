@@ -8,8 +8,11 @@ before basic tools, guiding LLMs to prefer the comprehensive versions.
 from typing import Dict, List, Callable, Any
 from fastmcp import FastMCP
 import logging
+from fastmcp.server.dependencies import get_http_headers
+
 
 logger = logging.getLogger(__name__)
+
 
 
 class ToolRegistrationHelper:
@@ -56,6 +59,14 @@ class ToolRegistrationHelper:
         logger.info(f"Successfully registered {total_tools} tools total")
 
 
+def get_extra_headers() -> Dict[str, str]:
+    headers = get_http_headers()
+    extra_headers = {}
+    for key, value in headers.items():
+        if key.lower().startswith('x-eka-'):
+            extra_headers[key.lstrip('x-eka-')] = value
+    return extra_headers
+            
 def create_tool_categories() -> Dict[str, List[str]]:
     """
     Define tool categories for better organization.

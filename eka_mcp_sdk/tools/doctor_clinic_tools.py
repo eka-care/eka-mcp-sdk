@@ -4,13 +4,14 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
-from ..utils.fastmcp_helper import readonly_tool_annotations
+from ..utils.fastmcp_helper import readonly_tool_annotations 
 
 from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.doctor_clinic_service import DoctorClinicService
+from ..utils.tool_registration import get_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_business_entities()
             
@@ -90,7 +91,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
             
@@ -134,7 +135,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
             
@@ -179,7 +180,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_services(doctor_id)
             
@@ -233,7 +234,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_doctor_profile(
                 doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
@@ -285,7 +286,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_clinic_profile(
                 clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit

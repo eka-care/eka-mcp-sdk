@@ -16,6 +16,7 @@ from ..utils.enrichment_helpers import (
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.patient_service import PatientService
+from ..utils.tool_registration import get_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.search_patients(prefix, limit, select)
             
@@ -106,7 +107,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.get_patient_details_basic(patient_id)
             
@@ -155,7 +156,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.get_comprehensive_patient_profile(
                 patient_id, include_appointments, appointment_limit
@@ -207,7 +208,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.add_patient(patient_data)
             
@@ -258,7 +259,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.list_patients(page_no, page_size, select, from_timestamp, include_archived)
             
@@ -304,7 +305,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.update_patient(patient_id, update_data)
             
@@ -345,7 +346,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.archive_patient(patient_id)
             return {"success": True, "data": result}
@@ -382,7 +383,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
             result = await patient_service.get_patient_by_mobile(mobile, full_profile)
             return {"success": True, "data": result}

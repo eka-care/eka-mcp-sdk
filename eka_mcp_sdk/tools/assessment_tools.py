@@ -8,6 +8,7 @@ from fastmcp.server.context import Context
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.assessment_service import AssessmentService
+from ..utils.tool_registration import get_extra_headers
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ def register_assessment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None)
-            
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+
             assessment_service = AssessmentService(client)
             
             result = await assessment_service.fetch_grouped_assessments(
