@@ -6,6 +6,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
+from ..utils.deduplicator import check_duplicate
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
@@ -130,6 +131,25 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
         """
         
+        # Check for duplicate request (ChatGPT multiple clients issue)
+        dedup_params = {
+            "patient_id": booking.patient_id,
+            "doctor_id": booking.doctor_id,
+            "clinic_id": booking.clinic_id,
+            "date": booking.date,
+            "start_time": booking.start_time,
+            "end_time": booking.end_time
+        }
+        if check_duplicate("book_appointment", **dedup_params):
+            await ctx.warning("⚡ DUPLICATE REQUEST DETECTED - Skipping appointment booking to prevent double-booking")
+            return {
+                "success": False,
+                "error": {
+                    "message": "Duplicate request detected. This appointment booking was already processed recently.",
+                    "error_code": "DUPLICATE_REQUEST"
+                }
+            }
+        
         await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
         
@@ -178,6 +198,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        enabled=False,
         description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
