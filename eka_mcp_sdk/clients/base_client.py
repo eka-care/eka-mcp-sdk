@@ -40,14 +40,12 @@ class BaseEkaClient(ABC):
 
             headers["client-id"] = settings.client_id
 
-            if self.access_token or self.client_secret:
+            if self.access_token or settings.client_secret:
                 # Get authentication context
                 auth_context = await self._auth_manager.get_auth_context()
             
-                # Prepare request
-                headers = auth_context.auth_headers
-            
-            # Add client-id header for all API calls
+                # Add auth headers for all apis
+                headers.update(auth_context.auth_headers)
             
             # Add instance custom headers
             if self._custom_headers:

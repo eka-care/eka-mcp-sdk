@@ -5,6 +5,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
+from ..utils.deduplicator import check_duplicate
 
 from ..utils.enrichment_helpers import (
     get_cached_data,
@@ -203,6 +204,17 @@ def register_patient_tools(mcp: FastMCP) -> None:
         - data: an object containing the created patient profile, including the unique patient ID (oid)
         """
 
+        # Check for duplicate request (ChatGPT multiple clients issue)
+        if check_duplicate("add_patient", **patient_data):
+            await ctx.warning("⚡ DUPLICATE REQUEST DETECTED - Skipping patient creation to prevent duplicate entry")
+            return {
+                "success": False,
+                "error": {
+                    "message": "Duplicate request detected. This patient creation was already processed recently.",
+                    "error_code": "DUPLICATE_REQUEST"
+                }
+            }
+        
         await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
         
