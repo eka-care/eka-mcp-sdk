@@ -5,7 +5,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
-from ..utils.deduplicator import check_duplicate
+from ..utils.deduplicator import get_deduplicator
 
 from ..utils.enrichment_helpers import (
     get_cached_data,
@@ -205,15 +205,12 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
 
         # Check for duplicate request (ChatGPT multiple clients issue)
-        if check_duplicate("add_patient", **patient_data):
-            await ctx.warning("⚡ DUPLICATE REQUEST DETECTED - Skipping patient creation to prevent duplicate entry")
-            return {
-                "success": False,
-                "error": {
-                    "message": "Duplicate request detected. This patient creation was already processed recently.",
-                    "error_code": "DUPLICATE_REQUEST"
-                }
-            }
+        dedup = get_deduplicator()
+        is_duplicate, cached_response = dedup.check_and_get_cached("add_patient", **patient_data)
+        
+        if is_duplicate and cached_response:
+            await ctx.info("⚡ DUPLICATE REQUEST - Returning cached patient response")
+            return cached_response
         
         await ctx.info(f"[add_patient] Creating new patient profile")
         await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
@@ -227,7 +224,10 @@ def register_patient_tools(mcp: FastMCP) -> None:
             patient_id = result.get('oid') if isinstance(result, dict) else None
             await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
             
-            return {"success": True, "data": result}
+            response = {"success": True, "data": result}
+            # Cache the successful response
+            dedup.cache_response("add_patient", response, **patient_data)
+            return response
         except EkaAPIError as e:
             await ctx.error(f"[add_patient] Failed: {e.message}\n")
             return {
