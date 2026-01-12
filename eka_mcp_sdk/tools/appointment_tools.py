@@ -6,7 +6,7 @@ from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
-from ..utils.deduplicator import check_duplicate
+from ..utils.deduplicator import get_deduplicator
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
@@ -132,6 +132,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         """
         
         # Check for duplicate request (ChatGPT multiple clients issue)
+        dedup = get_deduplicator()
         dedup_params = {
             "patient_id": booking.patient_id,
             "doctor_id": booking.doctor_id,
@@ -140,15 +141,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             "start_time": booking.start_time,
             "end_time": booking.end_time
         }
-        if check_duplicate("book_appointment", **dedup_params):
-            await ctx.warning("⚡ DUPLICATE REQUEST DETECTED - Skipping appointment booking to prevent double-booking")
-            return {
-                "success": False,
-                "error": {
-                    "message": "Duplicate request detected. This appointment booking was already processed recently.",
-                    "error_code": "DUPLICATE_REQUEST"
-                }
-            }
+        is_duplicate, cached_response = dedup.check_and_get_cached("book_appointment", **dedup_params)
+        
+        if is_duplicate and cached_response:
+            await ctx.info("⚡ DUPLICATE REQUEST - Returning cached appointment response")
+            return cached_response
         
         await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
@@ -185,7 +182,10 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
             await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
             
-            return {"success": True, "data": result}
+            response = {"success": True, "data": result}
+            # Cache the successful response
+            dedup.cache_response("book_appointment", response, **dedup_params)
+            return response
         except EkaAPIError as e:
             await ctx.error(f"[book_appointment] Failed: {e.message}\n")
             return {

@@ -35,6 +35,7 @@ class RequestDeduplicator:
                      Covers ~5-10 seconds of typical ChatGPT duplicate windows
         """
         self.recent_requests: deque = deque(maxlen=max_size)
+        self.response_cache: Dict[str, Any] = {}  # Cache responses by hash
         self.max_size = max_size
         logger.info(f"RequestDeduplicator initialized (queue_size={max_size})")
     
@@ -68,35 +69,36 @@ class RequestDeduplicator:
         full_hash = hashlib.sha256(request_str.encode()).hexdigest()
         return full_hash[:16]
     
-    def is_duplicate(self, tool_name: str, **params) -> bool:
+    def check_and_get_cached(self, tool_name: str, **params) -> tuple[bool, Any]:
         """
-        Check if this request was recently processed.
-        
-        If duplicate: Returns True and logs warning
-        If new: Adds to queue and returns False
+        Check if this request was recently processed and return cached response.
         
         Args:
             tool_name: Name of the MCP tool being invoked
             **params: All parameters passed to the tool
             
         Returns:
-            True if duplicate detected, False if new request
+            Tuple of (is_duplicate, cached_response)
+            - (False, None) if new request
+            - (True, response) if duplicate with cached response
             
         Example:
             ```python
-            if dedup.is_duplicate("add_patient", fln="John", mobile="+91..."):
-                return {"error": "Duplicate request"}
+            is_dup, cached = dedup.check_and_get_cached("add_patient", fln="John")
+            if is_dup:
+                return cached  # Return original response
             # Execute normally...
             ```
         """
         request_hash = self._hash_request(tool_name, **params)
         
         if request_hash in self.recent_requests:
+            cached_response = self.response_cache.get(request_hash)
             logger.warning(
                 f"⚡ DUPLICATE REQUEST DETECTED: {tool_name} "
-                f"(hash={request_hash}, queue_size={len(self.recent_requests)})"
+                f"(hash={request_hash}, returning cached response)"
             )
-            return True
+            return True, cached_response
         
         # New request - add to queue
         self.recent_requests.append(request_hash)
@@ -104,11 +106,34 @@ class RequestDeduplicator:
             f"✓ New request tracked: {tool_name} "
             f"(hash={request_hash}, queue_size={len(self.recent_requests)}/{self.max_size})"
         )
-        return False
+        return False, None
+    
+    def cache_response(self, tool_name: str, response: Any, **params) -> None:
+        """
+        Cache the response for a request.
+        
+        Args:
+            tool_name: Name of the MCP tool
+            response: The response to cache
+            **params: All tool parameters (same as used in check_and_get_cached)
+        """
+        request_hash = self._hash_request(tool_name, **params)
+        self.response_cache[request_hash] = response
+        logger.debug(f"✓ Cached response for {tool_name} (hash={request_hash})")
+    
+    def is_duplicate(self, tool_name: str, **params) -> bool:
+        """
+        DEPRECATED: Use check_and_get_cached() instead for better duplicate handling.
+        
+        This method only checks for duplicates without returning cached responses.
+        """
+        is_dup, _ = self.check_and_get_cached(tool_name, **params)
+        return is_dup
     
     def clear(self) -> None:
-        """Clear all tracked requests (useful for testing)."""
+        """Clear all tracked requests and cached responses (useful for testing)."""
         self.recent_requests.clear()
+        self.response_cache.clear()
         logger.info("RequestDeduplicator cleared")
     
     def get_stats(self) -> Dict[str, Any]:
@@ -116,6 +141,7 @@ class RequestDeduplicator:
         return {
             "queue_size": len(self.recent_requests),
             "max_size": self.max_size,
+            "cached_responses": len(self.response_cache),
             "utilization": f"{len(self.recent_requests) / self.max_size * 100:.1f}%"
         }
 
