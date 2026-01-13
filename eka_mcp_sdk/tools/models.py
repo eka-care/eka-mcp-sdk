@@ -65,7 +65,7 @@ class AppointmentBookingRequest(BaseModel):
     )
     end_time: str = Field(
         ...,
-        description="End time in HH:MM 24-hour format (default: start_time + 30 minutes)",
+        description="End time in HH:MM 24-hour format (default: start_time + 15 minutes)",
         pattern=r"^\d{2}:\d{2}$",
         examples=["15:30", "12:30"]
     )

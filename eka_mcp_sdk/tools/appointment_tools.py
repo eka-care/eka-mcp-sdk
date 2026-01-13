@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import result
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
@@ -8,14 +8,12 @@ from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
 from ..utils.deduplicator import get_deduplicator
-from datetime import datetime, timedelta
-
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
 from .models import AppointmentBookingRequest
-from ..utils.tool_registration import get_extra_headers
+from ..utils.tool_registratcion import get_extra_headers
 from ..utils.enrichment_helpers import (
     get_cached_data,
     extract_patient_summary,
@@ -26,11 +24,88 @@ from ..utils.enrichment_helpers import (
 logger = logging.getLogger(__name__)
 
 
+def find_alternate_slots(
+    all_slots: List[Dict[str, Any]], 
+    requested_date: str, 
+    requested_time: str,
+    max_alternatives: int = 6
+) -> List[Dict[str, str]]:
+    """
+    Find up to 6 nearest available slots around the requested time.
+    Returns slots both before and after the requested time.
+    
+    Args:
+        all_slots: List of all slots from the schedule
+        requested_date: Date in YYYY-MM-DD format
+        requested_time: Time in HH:MM format
+        max_alternatives: Maximum number of alternatives to return (default: 6)
+    
+    Returns:
+        List of alternate slot dictionaries with start_time, end_time, and date
+    """
+    # Parse requested datetime
+    requested_dt = datetime.strptime(f"{requested_date} {requested_time}", "%Y-%m-%d %H:%M")
+    
+    # Collect available slots with their time difference from requested time
+    available_with_distance = []
+    
+    for slot in all_slots:
+        if not slot.get('available', False):
+            continue
+        
+        slot_start = slot.get('s', '')
+        slot_end = slot.get('e', '')
+        
+        if not slot_start or not slot_end:
+            continue
+        
+        try:
+            # Parse slot start time (handle timezone)
+            # Format: "2026-01-13T14:15:00+05:30"
+            slot_start_clean = slot_start.split('+')[0] if '+' in slot_start else slot_start.split('-')[0] if '-' in slot_start and slot_start.count('-') > 2 else slot_start
+            slot_end_clean = slot_end.split('+')[0] if '+' in slot_end else slot_end.split('-')[0] if '-' in slot_end and slot_end.count('-') > 2 else slot_end
+            
+            slot_dt = datetime.strptime(slot_start_clean, "%Y-%m-%dT%H:%M:%S")
+            
+            # Calculate time difference in minutes
+            time_diff = abs((slot_dt - requested_dt).total_seconds() / 60)
+            
+            available_with_distance.append({
+                'start_time': slot_dt.strftime("%H:%M"),
+                'end_time': datetime.strptime(slot_end_clean, "%Y-%m-%dT%H:%M:%S").strftime("%H:%M"),
+                'date': slot_dt.strftime("%Y-%m-%d"),
+                'datetime': slot_dt,
+                'distance': time_diff,
+                'is_before': slot_dt < requested_dt
+            })
+        except Exception:
+            # Skip slots with parsing errors
+            continue
+    
+    # Sort by distance from requested time
+    available_with_distance.sort(key=lambda x: x['distance'])
+    
+    # Take the nearest slots up to max_alternatives
+    nearest_slots = available_with_distance[:max_alternatives]
+    
+    # Format for response (remove helper fields)
+    formatted_slots = [
+        {
+            'date': slot['date'],
+            'start_time': slot['start_time'],
+            'end_time': slot['end_time'],
+            'time_difference_minutes': int(slot['distance'])
+        }
+        for slot in nearest_slots
+    ]
+    
+    return formatted_slots
+
+
 def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
-        #description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking.",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -87,38 +162,55 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-    tags={"appointment", "write", "book", "create", "smart"},
-    annotations=write_tool_annotations()
+        #description="Book appointment for a patient. Automatically checks availability and suggests alternatives if slot unavailable.",
+        tags={"appointment", "write", "book", "create"},
+        annotations=write_tool_annotations()
     )
     async def book_appointment(
         booking: Annotated[
             AppointmentBookingRequest,
-            """Appointment booking details with validation.
+            """Appointment booking details with all required fields.
             
             Required fields:
-            - patient_id
-            - doctor_id
-            - clinic_id
-            - date (YYYY-MM-DD)
-            - start_time (HH:MM)
-            - end_time (HH:MM)
+            - patient_id: From list_patients or get_patient_by_mobile (e.g., "176650465340471")
+            - doctor_id: From get_business_entities (e.g., "do1765290197897")
+            - clinic_id: From get_business_entities (e.g., "c-b4c014c9c2aa415c88c9aaa7")
+            - date: YYYY-MM-DD format (e.g., "2025-12-30")
+            - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
+            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30")
+            
+            Optional fields:
+            - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
+            - reason: Visit reason (e.g., "Regular checkup")
+            
+            Time conversions:
+            - "noon" → 12:00, "3pm" → 15:00, "3:30pm" → 15:30
+            - Default duration: 15 minutes
             """
         ],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Smart appointment booking with mandatory availability validation.
-
-        Flow:
-        1. Fetch slots for start_date to start_date + 1
-        2. Validate exact slot existence
-        3. Reject if unavailable
-        4. Suggest nearest alternatives
-        5. Book ONLY if exact slot is available
-
-        Booking CANNOT be forced if slot is unavailable.
+        Smart appointment booking with automatic availability checking and alternate slot suggestions.
+        
+        This tool now:
+        1. Automatically checks slot availability before booking
+        2. Books immediately if the requested slot is available
+        3. Suggests up to 6 nearest alternative slots if unavailable (before and after requested time)
+        
+        When to Use This Tool
+        Use this tool when the user wants to book an appointment. The tool handles availability checking automatically.
+        
+        Trigger Keywords / Phrases
+        book appointment, schedule visit, confirm booking, book with doctor, 
+        schedule at noon / morning / afternoon, fix appointment, make an appointment
+        
+        What to Return
+        - If slot available: Returns booking confirmation with appointment_id
+        - If slot unavailable: Returns alternate slot suggestions (up to 6 nearest slots)
         """
-
+        
+        # Check for duplicate request
         dedup = get_deduplicator()
         dedup_params = {
             "patient_id": booking.patient_id,
@@ -126,196 +218,162 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             "clinic_id": booking.clinic_id,
             "date": booking.date,
             "start_time": booking.start_time,
-            "end_time": booking.end_time,
+            "end_time": booking.end_time
         }
-
-        is_duplicate, cached = dedup.check_and_get_cached(
-            "book_appointment", **dedup_params
-        )
-        if is_duplicate and cached:
-            await ctx.info("DUPLICATE REQUEST - Returning cached response")
-            return cached
-
-        await ctx.info(f"[book_appointment] Validating slot {booking.date} {booking.start_time}-{booking.end_time}")
-
+        is_duplicate, cached_response = dedup.check_and_get_cached("book_appointment", **dedup_params)
+        
+        if is_duplicate and cached_response:
+            await ctx.info("DUPLICATE REQUEST - Returning cached appointment response")
+            return cached_response
+        
+        await ctx.info(f"[book_appointment] Checking availability for patient {booking.patient_id}")
+        await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
+        
         try:
-            token = get_access_token()
-            client = EkaEMRClient(
-                access_token=token.token if token else None,
-                custom_headers=get_extra_headers()
-            )
+            # Step 1: Get appointment slots to check availability
+            token: AccessToken | None = get_access_token()
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
-
-            # ──────────────────────────────
-            # Step 1: Fetch slots (D → D+1)
-            # ──────────────────────────────
-            start_date = booking.date
-            end_date = (
-                datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=1)
-            ).strftime("%Y-%m-%d")
-
+            
+            # Calculate end_date as start_date + 1
+            start_date_obj = datetime.strptime(booking.date, "%Y-%m-%d")
+            end_date = (start_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
+            
+            await ctx.info(f"[book_appointment] Fetching slots from {booking.date} to {end_date}")
             slots_result = await appointment_service.get_appointment_slots(
-                booking.doctor_id,
-                booking.clinic_id,
-                start_date,
+                booking.doctor_id, 
+                booking.clinic_id, 
+                booking.date, 
                 end_date
             )
-
-            slots = slots_result.get("slots", []) if isinstance(slots_result, dict) else []
-
-            if not slots:
+            
+            # Step 2: Parse and check slot availability
+            schedule_data = slots_result.get('data', {}).get('schedule', {})
+            clinic_schedule = schedule_data.get(booking.clinic_id, [])
+            
+            if not clinic_schedule:
+                await ctx.error(f"[book_appointment] No schedule found for clinic {booking.clinic_id}")
                 return {
                     "success": False,
                     "error": {
-                        "message": "No slots available for selected date"
+                        "message": "No appointment schedule available for this clinic",
+                        "status_code": 404,
+                        "error_code": "NO_SCHEDULE"
                     }
                 }
-
-            # ──────────────────────────────
-            # Step 2: Parse requested slot
-            # ──────────────────────────────
-            requested_start = datetime.strptime(
-                f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M"
-            )
-
-            parsed_slots = []
-            for slot in slots:
-                if isinstance(slot.get("start_time"), int):
-                    slot_start = datetime.fromtimestamp(slot["start_time"])
-                    slot_end = datetime.fromtimestamp(slot["end_time"])
-                else:
-                    slot_start = datetime.fromisoformat(
-                        slot["start_time"].replace("Z", "+00:00")
-                    )
-                    slot_end = datetime.fromisoformat(
-                        slot["end_time"].replace("Z", "+00:00")
-                    )
-
-                parsed_slots.append({
-                    "start": slot_start,
-                    "end": slot_end,
-                    "available": slot.get("available", False),
-                    "start_str": slot_start.strftime("%H:%M"),
-                    "end_str": slot_end.strftime("%H:%M"),
-                })
-
-            # ──────────────────────────────
-            # Helper: nearest slots
-            # ──────────────────────────────
-            def find_nearest_slots(target, all_slots, count=6):
-                available = [s for s in all_slots if s["available"]]
-
-                before = [s for s in available if s["start"] < target]
-                after = [s for s in available if s["start"] >= target]
-
-                before.sort(key=lambda s: s["start"], reverse=True)
-                after.sort(key=lambda s: s["start"])
-
-                half = count // 2
-                selected = before[:half] + after[:half]
-                selected.sort(key=lambda s: s["start"])
-                return selected
-
-            # ──────────────────────────────
-            # Step 3: Exact slot match
-            # ──────────────────────────────
-            exact_slot = next(
-                (
-                    s for s in parsed_slots
-                    if s["start_str"] == booking.start_time
-                    and s["end_str"] == booking.end_time
-                ),
-                None
-            )
-
-            # Slot not in schedule
-            if not exact_slot:
-                nearest = find_nearest_slots(requested_start, parsed_slots)
+            
+            # Extract all slots from all services
+            all_slots = []
+            for service in clinic_schedule:
+                all_slots.extend(service.get('slots', []))
+            
+            # Convert requested time to comparable format
+            requested_start = f"{booking.date}T{booking.start_time}"
+            requested_end = f"{booking.date}T{booking.end_time}"
+            
+            # Find the requested slot
+            requested_slot = None
+            for slot in all_slots:
+                slot_start = slot.get('s', '')
+                slot_end = slot.get('e', '')
+                
+                # Normalize to same format (remove timezone for comparison)
+                slot_start_normalized = slot_start.split('+')[0] if '+' in slot_start else slot_start.split('-')[0] if '-' in slot_start and slot_start.count('-') > 2 else slot_start
+                slot_end_normalized = slot_end.split('+')[0] if '+' in slot_end else slot_end.split('-')[0] if '-' in slot_end and slot_end.count('-') > 2 else slot_end
+                
+                if slot_start_normalized.startswith(requested_start) and slot_end_normalized.startswith(requested_end):
+                    requested_slot = slot
+                    break
+            
+            if not requested_slot:
+                await ctx.error(f"[book_appointment] Requested time slot not found in schedule")
                 return {
                     "success": False,
                     "error": {
-                        "message": "Requested time is not in doctor's schedule",
-                        "requested_time": f"{booking.start_time}-{booking.end_time}",
-                        "nearest_available_slots": [
-                            {
-                                "time": f"{s['start_str']}-{s['end_str']}",
-                                "difference_minutes": int(
-                                    abs((s["start"] - requested_start).total_seconds()) / 60
-                                ),
-                            }
-                            for s in nearest
-                        ],
-                    },
+                        "message": f"Time slot {booking.start_time}-{booking.end_time} not found in doctor's schedule",
+                        "status_code": 404,
+                        "error_code": "SLOT_NOT_FOUND"
+                    }
                 }
-
-            # Slot exists but unavailable
-            if not exact_slot["available"]:
-                nearest = find_nearest_slots(requested_start, parsed_slots)
-                return {
+            
+            # Step 3: Check if slot is available
+            if not requested_slot.get('available', False):
+                await ctx.info(f"[book_appointment] Requested slot unavailable, finding alternatives")
+                
+                # Find alternate slots
+                alternate_slots = find_alternate_slots(
+                    all_slots, 
+                    booking.date, 
+                    booking.start_time, 
+                    max_alternatives=6
+                )
+                
+                response = {
                     "success": False,
+                    "slot_unavailable": True,
+                    "message": f"The requested time slot {booking.start_time}-{booking.end_time} is not available.",
+                    "requested_slot": {
+                        "date": booking.date,
+                        "start_time": booking.start_time,
+                        "end_time": booking.end_time,
+                        "available": False
+                    },
+                    "alternate_slots": alternate_slots,
                     "error": {
                         "message": "Requested slot is already booked",
-                        "requested_time": f"{booking.start_time}-{booking.end_time}",
-                        "nearest_available_slots": [
-                            {
-                                "time": f"{s['start_str']}-{s['end_str']}",
-                                "minutes_difference": int(
-                                    abs((s["start"] - requested_start).total_seconds()) / 60
-                                ),
-                            }
-                            for s in nearest
-                        ],
-                    },
+                        "status_code": 409,
+                        "error_code": "SLOT_UNAVAILABLE"
+                    }
                 }
-
-            # ──────────────────────────────
-            # Step 4: Slot available → Book
-            # ──────────────────────────────
-            await ctx.info("[book_appointment] Slot validated, proceeding to booking")
-
-            start_ts = int(
-                datetime.strptime(
-                    f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M"
-                ).timestamp()
-            )
-            end_ts = int(
-                datetime.strptime(
-                    f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M"
-                ).timestamp()
-            )
-
+                
+                # Don't cache unavailable slot responses as availability changes
+                return response
+            
+            # Step 4: Slot is available, proceed with booking
+            await ctx.info(f"[book_appointment] Slot available, proceeding with booking")
+            
+            # Convert date and time to Unix timestamps
+            date_time_start = datetime.strptime(f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M")
+            date_time_end = datetime.strptime(f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M")
+            start_timestamp = int(date_time_start.timestamp())
+            end_timestamp = int(date_time_end.timestamp())
+            
+            # Build request body
             appointment_data = {
                 "clinic_id": booking.clinic_id,
                 "doctor_id": booking.doctor_id,
                 "patient_id": booking.patient_id,
                 "appointment_details": {
-                    "start_time": start_ts,
-                    "end_time": end_ts,
-                    "mode": booking.mode,
-                },
+                    "start_time": start_timestamp,
+                    "end_time": end_timestamp,
+                    "mode": booking.mode
+                }
             }
-
             if booking.reason:
                 appointment_data["appointment_details"]["reason"] = booking.reason
-
+            
+            await ctx.debug(f"Constructed appointment data: {appointment_data}")
             result = await appointment_service.book_appointment(appointment_data)
-
+            
+            appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
+            await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
+            
             response = {"success": True, "data": result}
+            # Cache the successful response
             dedup.cache_response("book_appointment", response, **dedup_params)
-
             return response
-
+            
         except EkaAPIError as e:
-            await ctx.error(f"[book_appointment] Failed: {e.message}")
+            await ctx.error(f"[book_appointment] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
                     "message": e.message,
                     "status_code": e.status_code,
-                    "error_code": e.error_code,
-                },
+                    "error_code": e.error_code
+                }
             }
-    
+        
     @mcp.tool(
         enabled=False,
         #description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
