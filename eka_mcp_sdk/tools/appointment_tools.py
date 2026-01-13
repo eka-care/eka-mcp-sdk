@@ -1,12 +1,15 @@
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from datetime import datetime
+from unittest import result
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
 from ..utils.deduplicator import get_deduplicator
+from datetime import datetime, timedelta
+
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
@@ -27,7 +30,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
-        description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking.",
+        #description="Get available appointment slots for a doctor at a specific clinic on a given date. Check available slots before booking.",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -35,7 +38,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
         clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
         start_date: Annotated[str, "Start date YYYY-MM-DD"],
-        end_date: Annotated[str, "End date YYYY-MM-DD (max: start_date + 1)"],
+        end_date: Annotated[str, "End date YYYY-MM-DD (must be start_date + 1)"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -43,11 +46,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
         When to Use This Tool
         Use this tool when the user wants to check availability before booking an appointment, rescheduling, or exploring alternative times. 
-        This tool must be called before attempting to book an appointment. 
+        This tool must be called before attempting to book an appointment. When searching set end_date as (start_date +1) 
         Only valid for short-range availability checks (today or tomorrow).
+        If that specific time slot is booked then there is conflict and another booking CANNOT BE MADE NO MATTER WHAT.
 
         Constraints:
-        - Date range must be D to D+1 only.
+        - Date range must be D to D+1 only. (D is start_date)
         - Requires valid doctor_id and clinic_id from get_business_entities.
 
         Trigger Keywords / Phrases
@@ -55,8 +59,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         appointments today / tomorrow, book at noon / morning / afternoon, what times are open
  
         What to Return
-        Returns a list of appointment slots with start_time, end_time, and available (boolean).
-
+        Returns a list of appointment slots with start_time, end_time, and available (boolean).        
         If no slots are available, returns an empty slots array. Do not attempt booking within this tool.
 
         """
@@ -84,54 +87,38 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Book appointment for a patient. Need: patient_id, doctor_id, clinic_id, date, time. Check slots first recommended.",
-        tags={"appointment", "write", "book", "create"},
-        annotations=write_tool_annotations()
+    tags={"appointment", "write", "book", "create", "smart"},
+    annotations=write_tool_annotations()
     )
     async def book_appointment(
         booking: Annotated[
             AppointmentBookingRequest,
-            """Appointment booking details with all required fields.
+            """Appointment booking details with validation.
             
             Required fields:
-            - patient_id: From list_patients or get_patient_by_mobile (e.g., "176650465340471")
-            - doctor_id: From get_business_entities (e.g., "do1765290197897")
-            - clinic_id: From get_business_entities (e.g., "c-b4c014c9c2aa415c88c9aaa7")
-            - date: YYYY-MM-DD format (e.g., "2025-12-30")
-            - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
-            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30")
-            
-            Optional fields:
-            - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
-            - reason: Visit reason (e.g., "Regular checkup")
-            
-            Time conversions:
-            - "noon" → 12:00, "3pm" → 15:00, "3:30pm" → 15:30
-            - Default duration: 30 minutes
+            - patient_id
+            - doctor_id
+            - clinic_id
+            - date (YYYY-MM-DD)
+            - start_time (HH:MM)
+            - end_time (HH:MM)
             """
         ],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Book an appointment for a patient with a specific doctor at a clinic on a given date and time.
+        Smart appointment booking with mandatory availability validation.
 
-        When to Use This Tool
-        Use this tool when the user wants to confirm and create a new appointment after selecting a specific time slot.
-        This tool should be used only after patient, doctor, and clinic information is available.
-        It is strongly recommended to verify slot availability using get_appointment_slots before booking.
+        Flow:
+        1. Fetch slots for start_date to start_date + 1
+        2. Validate exact slot existence
+        3. Reject if unavailable
+        4. Suggest nearest alternatives
+        5. Book ONLY if exact slot is available
 
-        Trigger Keywords / Phrases
-        book appointment, schedule visit, confirm booking, book with doctor, 
-        schedule at noon / morning / afternoon, fix appointment, make an appointment
-
-        What to Return
-        Returns booking confirmation details including the appointment_id and associated metadata.
-
-        If booking fails, returns an error response. This tool performs a write action and should not be retried without user confirmation.
-
+        Booking CANNOT be forced if slot is unavailable.
         """
-        
-        # Check for duplicate request (ChatGPT multiple clients issue)
+
         dedup = get_deduplicator()
         dedup_params = {
             "patient_id": booking.patient_id,
@@ -139,67 +126,199 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             "clinic_id": booking.clinic_id,
             "date": booking.date,
             "start_time": booking.start_time,
-            "end_time": booking.end_time
+            "end_time": booking.end_time,
         }
-        is_duplicate, cached_response = dedup.check_and_get_cached("book_appointment", **dedup_params)
-        
-        if is_duplicate and cached_response:
-            await ctx.info("⚡ DUPLICATE REQUEST - Returning cached appointment response")
-            return cached_response
-        
-        await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
-        await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
-        
+
+        is_duplicate, cached = dedup.check_and_get_cached(
+            "book_appointment", **dedup_params
+        )
+        if is_duplicate and cached:
+            await ctx.info("DUPLICATE REQUEST - Returning cached response")
+            return cached
+
+        await ctx.info(f"[book_appointment] Validating slot {booking.date} {booking.start_time}-{booking.end_time}")
+
         try:
-            # Convert date and time to Unix timestamps
-            date_time_start = datetime.strptime(f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M")
-            date_time_end = datetime.strptime(f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M")
-            start_timestamp = int(date_time_start.timestamp())
-            end_timestamp = int(date_time_end.timestamp())
-            
-            # Build request body matching Eka Care API format (EkaIds tab)
-            # Top-level: clinic_id, doctor_id, patient_id (snake_case)
-            # Nested: appointment_details with Unix timestamps
+            token = get_access_token()
+            client = EkaEMRClient(
+                access_token=token.token if token else None,
+                custom_headers=get_extra_headers()
+            )
+            appointment_service = AppointmentService(client)
+
+            # ──────────────────────────────
+            # Step 1: Fetch slots (D → D+1)
+            # ──────────────────────────────
+            start_date = booking.date
+            end_date = (
+                datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=1)
+            ).strftime("%Y-%m-%d")
+
+            slots_result = await appointment_service.get_appointment_slots(
+                booking.doctor_id,
+                booking.clinic_id,
+                start_date,
+                end_date
+            )
+
+            slots = slots_result.get("slots", []) if isinstance(slots_result, dict) else []
+
+            if not slots:
+                return {
+                    "success": False,
+                    "error": {
+                        "message": "No slots available for selected date"
+                    }
+                }
+
+            # ──────────────────────────────
+            # Step 2: Parse requested slot
+            # ──────────────────────────────
+            requested_start = datetime.strptime(
+                f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M"
+            )
+
+            parsed_slots = []
+            for slot in slots:
+                if isinstance(slot.get("start_time"), int):
+                    slot_start = datetime.fromtimestamp(slot["start_time"])
+                    slot_end = datetime.fromtimestamp(slot["end_time"])
+                else:
+                    slot_start = datetime.fromisoformat(
+                        slot["start_time"].replace("Z", "+00:00")
+                    )
+                    slot_end = datetime.fromisoformat(
+                        slot["end_time"].replace("Z", "+00:00")
+                    )
+
+                parsed_slots.append({
+                    "start": slot_start,
+                    "end": slot_end,
+                    "available": slot.get("available", False),
+                    "start_str": slot_start.strftime("%H:%M"),
+                    "end_str": slot_end.strftime("%H:%M"),
+                })
+
+            # ──────────────────────────────
+            # Helper: nearest slots
+            # ──────────────────────────────
+            def find_nearest_slots(target, all_slots, count=6):
+                available = [s for s in all_slots if s["available"]]
+
+                before = [s for s in available if s["start"] < target]
+                after = [s for s in available if s["start"] >= target]
+
+                before.sort(key=lambda s: s["start"], reverse=True)
+                after.sort(key=lambda s: s["start"])
+
+                half = count // 2
+                selected = before[:half] + after[:half]
+                selected.sort(key=lambda s: s["start"])
+                return selected
+
+            # ──────────────────────────────
+            # Step 3: Exact slot match
+            # ──────────────────────────────
+            exact_slot = next(
+                (
+                    s for s in parsed_slots
+                    if s["start_str"] == booking.start_time
+                    and s["end_str"] == booking.end_time
+                ),
+                None
+            )
+
+            # Slot not in schedule
+            if not exact_slot:
+                nearest = find_nearest_slots(requested_start, parsed_slots)
+                return {
+                    "success": False,
+                    "error": {
+                        "message": "Requested time is not in doctor's schedule",
+                        "requested_time": f"{booking.start_time}-{booking.end_time}",
+                        "nearest_available_slots": [
+                            {
+                                "time": f"{s['start_str']}-{s['end_str']}",
+                                "difference_minutes": int(
+                                    abs((s["start"] - requested_start).total_seconds()) / 60
+                                ),
+                            }
+                            for s in nearest
+                        ],
+                    },
+                }
+
+            # Slot exists but unavailable
+            if not exact_slot["available"]:
+                nearest = find_nearest_slots(requested_start, parsed_slots)
+                return {
+                    "success": False,
+                    "error": {
+                        "message": "Requested slot is already booked",
+                        "requested_time": f"{booking.start_time}-{booking.end_time}",
+                        "nearest_available_slots": [
+                            {
+                                "time": f"{s['start_str']}-{s['end_str']}",
+                                "minutes_difference": int(
+                                    abs((s["start"] - requested_start).total_seconds()) / 60
+                                ),
+                            }
+                            for s in nearest
+                        ],
+                    },
+                }
+
+            # ──────────────────────────────
+            # Step 4: Slot available → Book
+            # ──────────────────────────────
+            await ctx.info("[book_appointment] Slot validated, proceeding to booking")
+
+            start_ts = int(
+                datetime.strptime(
+                    f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M"
+                ).timestamp()
+            )
+            end_ts = int(
+                datetime.strptime(
+                    f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M"
+                ).timestamp()
+            )
+
             appointment_data = {
                 "clinic_id": booking.clinic_id,
                 "doctor_id": booking.doctor_id,
                 "patient_id": booking.patient_id,
                 "appointment_details": {
-                    "start_time": start_timestamp,
-                    "end_time": end_timestamp,
-                    "mode": booking.mode
-                }
+                    "start_time": start_ts,
+                    "end_time": end_ts,
+                    "mode": booking.mode,
+                },
             }
+
             if booking.reason:
                 appointment_data["appointment_details"]["reason"] = booking.reason
-            
-            await ctx.debug(f"Constructed appointment data: {appointment_data}")
-            token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
-            appointment_service = AppointmentService(client)
+
             result = await appointment_service.book_appointment(appointment_data)
-            
-            appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
-            await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
-            
+
             response = {"success": True, "data": result}
-            # Cache the successful response
             dedup.cache_response("book_appointment", response, **dedup_params)
+
             return response
+
         except EkaAPIError as e:
-            await ctx.error(f"[book_appointment] Failed: {e.message}\n")
+            await ctx.error(f"[book_appointment] Failed: {e.message}")
             return {
                 "success": False,
                 "error": {
                     "message": e.message,
                     "status_code": e.status_code,
-                    "error_code": e.error_code
-                }
+                    "error_code": e.error_code,
+                },
             }
     
     @mcp.tool(
         enabled=False,
-        description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
+        #description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
     )
@@ -269,7 +388,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "List appointments with minimal data (IDs only) for internal or lightweight use.",
+        #description = "List appointments with minimal data (IDs only) for internal or lightweight use.",
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -284,7 +403,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """
         Retrieve a list of appointments with basic data containing entity IDs only, without patient, doctor, or clinic details.
-
+                
         When to Use This Tool
         Use this tool only when raw appointment records are required. Use get_appointments_enriched otherwise.
         This tool is intended for internal workflows, debugging, or follow-up calls where entity details will be resolved separately.
@@ -329,7 +448,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "Get complete details for a single appointment including patient, doctor, and clinic information.",
+        #description = "Get complete details for a single appointment including patient, doctor, and clinic information.",
         enabled=False,   
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
@@ -341,7 +460,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """
         Get comprehensive appointment details with complete patient, doctor, and clinic information.
-        
+
         When to Use This Tool
         Use this tool when the user wants to view complete information for a specific appointment.
         This is the preferred tool for fetching single appointment details and should be used instead of basic appointment detail tools whenever available.
@@ -379,7 +498,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
-        description = "Get basic details for a single appointment with entity IDs only.",
+        #description = "Get basic details for a single appointment with entity IDs only.",
         enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
@@ -426,7 +545,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "List all appointments for a patient with enriched doctor and clinic details.",
+        #description = "List all appointments for a patient with enriched doctor and clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
@@ -481,7 +600,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description= "List basic appointment records for a patient without doctor or clinic details.",
+        #description= "List basic appointment records for a patient without doctor or clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "basic"},
         annotations=readonly_tool_annotations()
@@ -531,7 +650,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "Update an existing appointment’s status, timing, or other supported attributes.",
+        #description = "Update an existing appointment’s status, timing, or other supported attributes.",
         enabled=False,
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
@@ -582,7 +701,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "Mark an appointment as completed with final status and notes.",
+        #description = "Mark an appointment as completed with final status and notes.",
         tags={"appointment", "write", "complete", "status"},
         annotations=write_tool_annotations()
     )
@@ -631,7 +750,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "Cancel an existing appointment and record cancellation details.",
+        #description = "Cancel an existing appointment and record cancellation details.",
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -678,7 +797,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description = "Change an existing appointment to a new date or time.",
+        #description = "Change an existing appointment to a new date or time.",
         enabled=False,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
