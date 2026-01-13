@@ -52,7 +52,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Trigger Keywords
         search patient, patient search, find patient, quick patient search
 
-        Returns dict with success (bool) and data (dict) #CHANGE
+        Returns dict with success (bool) and data (dict) 
         
         """
         await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
@@ -207,27 +207,27 @@ def register_patient_tools(mcp: FastMCP) -> None:
 
         # Check for duplicate request (ChatGPT multiple clients issue)
         dedup = get_deduplicator()
-        is_duplicate, cached_response = dedup.check_and_get_cached("add_patient", **patient_dict)  # Changed here
+        is_duplicate, cached_response = dedup.check_and_get_cached("add_patient", **patient_dict)  
         
         if is_duplicate and cached_response:
             await ctx.info("⚡ DUPLICATE REQUEST - Returning cached patient response")
             return cached_response
         
         await ctx.info(f"[add_patient] Creating new patient profile")
-        await ctx.debug(f"Patient data keys: {list(patient_dict.keys())}")  # Changed here
+        await ctx.debug(f"Patient data keys: {list(patient_dict.keys())}")  
         
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
-            result = await patient_service.add_patient(patient_dict)  # Changed here
+            result = await patient_service.add_patient(patient_dict)  
             
             patient_id = result.get('oid') if isinstance(result, dict) else None
             await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
             
             response = {"success": True, "data": result}
             # Cache the successful response
-            dedup.cache_response("add_patient", response, **patient_dict)  # Changed here
+            dedup.cache_response("add_patient", response, **patient_dict)  
             return response
         except EkaAPIError as e:
             await ctx.error(f"[add_patient] Failed: {e.message}\n")
