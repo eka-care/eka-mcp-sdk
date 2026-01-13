@@ -4,6 +4,31 @@ from datetime import datetime
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator
 
+class PatientData(BaseModel):
+    fln: str = Field(
+        ..., 
+        description="Full legal name"
+    )
+    dob: str = Field(
+        ..., 
+        description="Date of birth (YYYY-MM-DD)"
+    )
+    gen: str = Field(
+        ..., 
+        description="Gender"
+    )
+    mobile: Optional[str] = Field(
+        None, 
+        description="Mobile number with country code (+91...)"
+    )
+    email: Optional[str] = Field(
+        None, 
+        description="Email address"
+    )
+    address: Optional[str] = Field(
+        None, 
+        description="Physical address"
+    )
 
 class AppointmentBookingRequest(BaseModel):
     """Appointment booking request model matching Eka Care API specification."""

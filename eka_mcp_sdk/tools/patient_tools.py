@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, List, Annotated
 import logging
+from eka_mcp_sdk.tools.models import PatientData
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
@@ -51,7 +52,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Trigger Keywords
         search patient, patient search, find patient, quick patient search
 
-        Returns dict with success (bool) and data (dict) #CHANGE
+        Returns dict with success (bool) and data (dict) 
         
         """
         await ctx.info(f"[search_patients] Searching patients with prefix: {prefix}")
@@ -178,15 +179,13 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Create new patient. Required: fln (name), dob (YYYY-MM-DD), gen (M/F/O). Use when patient not found.",
-        tags={"patient", "write"},
-        annotations=write_tool_annotations()
-    )
-    # pydantic model should be used here for patient_data
+    tags={"patient", "write"},
+    annotations=write_tool_annotations()
+)
     async def add_patient(
-        patient_data: Annotated[Dict[str, Any], "Required: fln, dob, gen. Optional: mobile (+91...), email, address"],
+        patient_data: PatientData,
         ctx: Context = CurrentContext()
-        ) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
         """
         Creates a new patient profile and returns a unique patient identifier.
 
@@ -203,30 +202,32 @@ def register_patient_tools(mcp: FastMCP) -> None:
         - success: boolean indicating whether patient creation succeeded
         - data: an object containing the created patient profile, including the unique patient ID (oid)
         """
+        # Convert Pydantic model to dict for deduplication and API call
+        patient_dict = patient_data.model_dump(exclude_none=True)
 
         # Check for duplicate request (ChatGPT multiple clients issue)
         dedup = get_deduplicator()
-        is_duplicate, cached_response = dedup.check_and_get_cached("add_patient", **patient_data)
+        is_duplicate, cached_response = dedup.check_and_get_cached("add_patient", **patient_dict)  
         
         if is_duplicate and cached_response:
             await ctx.info("⚡ DUPLICATE REQUEST - Returning cached patient response")
             return cached_response
         
         await ctx.info(f"[add_patient] Creating new patient profile")
-        await ctx.debug(f"Patient data keys: {list(patient_data.keys())}")
+        await ctx.debug(f"Patient data keys: {list(patient_dict.keys())}")  
         
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             patient_service = PatientService(client)
-            result = await patient_service.add_patient(patient_data)
+            result = await patient_service.add_patient(patient_dict)  
             
             patient_id = result.get('oid') if isinstance(result, dict) else None
             await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
             
             response = {"success": True, "data": result}
             # Cache the successful response
-            dedup.cache_response("add_patient", response, **patient_data)
+            dedup.cache_response("add_patient", response, **patient_dict)  
             return response
         except EkaAPIError as e:
             await ctx.error(f"[add_patient] Failed: {e.message}\n")
