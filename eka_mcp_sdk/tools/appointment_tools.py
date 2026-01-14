@@ -171,7 +171,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Book appointment for a patient. Automatically checks availability and suggests alternatives if slot unavailable.",
         tags={"appointment", "write", "book", "create"},
         annotations=write_tool_annotations()
     )
@@ -299,7 +298,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
     @mcp.tool(
         enabled=False,
-        #description="Get appointments with filters. Use patient_id alone OR use dates (cannot combine both).",
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
     )
@@ -369,7 +367,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "List appointments with minimal data (IDs only) for internal or lightweight use.",
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -433,7 +430,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "Get complete details for a single appointment including patient, doctor, and clinic information.",
         enabled=False,   
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
@@ -483,7 +479,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
-        #description = "Get basic details for a single appointment with entity IDs only.",
         enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
@@ -530,7 +525,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "List all appointments for a patient with enriched doctor and clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
@@ -585,7 +579,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description= "List basic appointment records for a patient without doctor or clinic details.",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "basic"},
         annotations=readonly_tool_annotations()
@@ -635,7 +628,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "Update an existing appointment’s status, timing, or other supported attributes.",
         enabled=False,
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
@@ -686,7 +678,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "Mark an appointment as completed with final status and notes.",
         tags={"appointment", "write", "complete", "status"},
         annotations=write_tool_annotations()
     )
@@ -735,7 +726,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "Cancel an existing appointment and record cancellation details.",
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -782,7 +772,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description = "Change an existing appointment to a new date or time.",
         enabled=False,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()

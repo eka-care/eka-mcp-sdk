@@ -20,7 +20,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     """Register Doctor and Clinic Information MCP tools."""
     
     @mcp.tool(
-        #description="Get all doctors and clinics details for a business. Use this to find doctor_id and clinic_id by doctor name for bookings.",
         tags={"doctor", "clinic", "read", "list", "primary"},
         annotations=readonly_tool_annotations()
     )
@@ -66,7 +65,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get basic profile information for a doctor.",
         tags={"doctor", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -110,7 +108,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get basic profile information for a clinic.",
         tags={"clinic", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -154,7 +151,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="List services and specialties offered by a doctor.",
         enabled=False,
         tags={"doctor", "read", "services"},
         annotations=readonly_tool_annotations()
@@ -200,7 +196,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get a full doctor profile including clinics, services, and recent appointments.",
         enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
@@ -255,7 +250,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get a full clinic profile including doctors, services, and recent appointments.",
         enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()

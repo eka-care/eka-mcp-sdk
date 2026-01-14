@@ -27,7 +27,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
     @mcp.tool(
-        #description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile.",
         enabled=False,
     )
     async def search_patients(
@@ -80,7 +79,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information.",
         enabled=False,
         tags={"patient", "read", "basic", "profile"},
         annotations=readonly_tool_annotations()
@@ -129,7 +127,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Get complete patient profile with appointment history. Use for 'show patient details' or viewing appointments.",
         tags={"patient", "read", "appointments"},
         annotations=readonly_tool_annotations()
     )
@@ -242,7 +239,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="List patient profiles by browsing pages when no identifier is known",
         tags={"patient", "read", "list", "browse"},
         annotations=readonly_tool_annotations()
     )
@@ -293,7 +289,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Update existing patient profile. Use when correcting or adding patient details.",
         tags={"patient", "write", "update"},
         annotations=write_tool_annotations()
     )
@@ -338,7 +333,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Archive a patient profile. Use to hide/remove patient profiles.",
         tags={"patient", "write", "archive", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -375,7 +369,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        #description="Find patient by mobile number. Use this when user provides mobile. Fast and exact match.",
         tags={"patient", "read", "search", "mobile"},
         annotations=readonly_tool_annotations()
     )
