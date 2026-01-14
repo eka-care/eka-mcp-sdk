@@ -81,6 +81,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         #description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information.",
+        enabled=False,
         tags={"patient", "read", "basic", "profile"},
         annotations=readonly_tool_annotations()
     )

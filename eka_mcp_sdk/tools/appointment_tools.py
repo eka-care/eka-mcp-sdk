@@ -36,7 +36,7 @@ def find_alternate_slots(
     
     Args:
         all_slots: List of all slots from the schedule
-        requested_date: Date in YYYY-MM-DD format
+        requested_datec: Date in YYYY-MM-DD format
         requested_time: Time in HH:MM format
         max_alternatives: Maximum number of alternatives to return (default: 6)
     
@@ -454,7 +454,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         clinic_id: Annotated[Optional[str], "Clinic ID"] = None,
         patient_id: Annotated[Optional[str], "Patient ID"] = None,
         start_date: Annotated[Optional[str], "Start date YYYY-MM-DD"] = None,
-        end_date: Annotated[Optional[str], "End date YYYY-MM-DD"] = None,
+        end_date: Annotated[Optional[str], "End date YYYY-MM-DD, (start_date+1)<=end_date"] = None,
         page_no: Annotated[int, "Pagination page number"] = 0,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
