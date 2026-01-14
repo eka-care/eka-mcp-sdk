@@ -23,7 +23,7 @@ from ..utils.enrichment_helpers import (
 
 logger = logging.getLogger(__name__)
 
-from .book_appointment_utils import (
+from ..utils.book_appointment_utils import (
     check_slot_availability,
     extract_all_slots_from_schedule,
     build_appointment_data,
