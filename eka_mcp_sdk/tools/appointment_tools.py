@@ -167,26 +167,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         annotations=write_tool_annotations()
     )
     async def book_appointment(
-        booking: Annotated[
-            AppointmentBookingRequest,
-            """Appointment booking details with all required fields.
-            
-            Required fields:
-            - patient_id: From list_patients or get_patient_by_mobile (e.g., "176650465340471")
-            - doctor_id: From get_business_entities (e.g., "do1765290197897")
-            - clinic_id: From get_business_entities (e.g., "c-b4c014c9c2aa415c88c9aaa7")
-            - date: YYYY-MM-DD format (e.g., "2025-12-30")
-            - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
-            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30"). 
-                            
-            Optional fields:
-            - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
-            - reason: Visit reason (e.g., "Regular checkup")
-            
-            Time conversions:
-            - "noon" → 12:00, "3pm" → 15:00, "3:30pm" → 15:30
-            """
-        ],
+        booking: AppointmentBookingRequest,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -208,6 +189,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         - If slot available: Returns booking confirmation with appointment_id
         - If slot unavailable: Returns alternate slot suggestions (up to 6 nearest slots)
         """
+        # Convert Pydantic model to dict for deduplication and API call
+        booking_dict = booking.model_dump(exclude_none=True)
         
         # Check for duplicate request
         dedup = get_deduplicator()
