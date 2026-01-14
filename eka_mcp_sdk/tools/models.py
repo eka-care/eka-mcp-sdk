@@ -64,8 +64,8 @@ class AppointmentBookingRequest(BaseModel):
         examples=["15:00", "12:00"]
     )
     end_time: str = Field(
-        None,
-        description="End time in HH:MM 24-hour format (fetched from slot data if not provided)",
+        ...,
+        description="End time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
         pattern=r"^\d{2}:\d{2}$",
         examples=["15:30", "12:30"]
     )
