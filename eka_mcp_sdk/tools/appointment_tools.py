@@ -13,7 +13,7 @@ from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
 from .models import AppointmentBookingRequest
-from ..utils.tool_registratcion import get_extra_headers
+from ..utils.tool_registration import get_extra_headers
 from ..utils.enrichment_helpers import (
     get_cached_data,
     extract_patient_summary,
@@ -177,15 +177,15 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             - clinic_id: From get_business_entities (e.g., "c-b4c014c9c2aa415c88c9aaa7")
             - date: YYYY-MM-DD format (e.g., "2025-12-30")
             - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
-            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30")
-            
+            - end_time: HH:MM 24hr format (e.g., "15:30", "12:30"). 
+                Automatically calculated as start_time + 15 minutes if user does not specify duration
+                            
             Optional fields:
             - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
             - reason: Visit reason (e.g., "Regular checkup")
             
             Time conversions:
             - "noon" → 12:00, "3pm" → 15:00, "3:30pm" → 15:30
-            - Default duration: 15 minutes
             """
         ],
         ctx: Context = CurrentContext()
@@ -380,7 +380,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
     )
-    async def get_appointments_enriched(
+    async def show_appointments_enriched(
         patient_id: Annotated[Optional[str], "Filter by patient (cannot use with dates)"] = None,
         doctor_id: Annotated[Optional[str], "Filter by doctor"] = None,
         clinic_id: Annotated[Optional[str], "Filter by clinic"] = None,
@@ -415,13 +415,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                               f"patient={patient_id}" if patient_id else None,
                               f"dates={start_date} to {end_date}" if start_date or end_date else None] if f]
         filter_str = ", ".join(filters) if filters else "no filters"
-        await ctx.info(f"[get_appointments_enriched] Getting enriched appointments with {filter_str}")
+        await ctx.info(f"[show_appointments_enriched] Getting enriched appointments with {filter_str}")
         
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
-            result = await appointment_service.get_appointments_enriched(
+            result = await appointment_service.show_appointments_enriched(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
                 patient_id=patient_id,
@@ -431,11 +431,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             )
             
             appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
-            await ctx.info(f"[get_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
+            await ctx.info(f"[show_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"[get_appointments_enriched] Failed: {e.message}\n")
+            await ctx.error(f"[show_appointments_enriched] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {
@@ -450,7 +450,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
-    async def get_appointments_basic(
+    async def show_appointments_basic(
         doctor_id: Annotated[Optional[str], "Doctor ID"] = None,
         clinic_id: Annotated[Optional[str], "Clinic ID"] = None,
         patient_id: Annotated[Optional[str], "Patient ID"] = None,
@@ -463,9 +463,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Retrieve a list of appointments with basic data containing entity IDs only, without patient, doctor, or clinic details.
                 
         When to Use This Tool
-        Use this tool only when raw appointment records are required. Use get_appointments_enriched otherwise.
+        Use this tool only when raw appointment records are required. Use show_appointments_enriched otherwise.
         This tool is intended for internal workflows, debugging, or follow-up calls where entity details will be resolved separately.
-
+        
         Trigger Keywords / Phrases
         raw appointments, appointment ids, basic appointment list, internal lookup,
         debug appointments, lightweight appointment data
@@ -473,15 +473,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         Returns:
         Basic appointments with entity IDs only
         If no appointments match the filters, returns an empty appointments array.
+        Timestamps are Unix epoch (UTC-based).
+        IMPORTANT: Always use Python/bash to convert timestamps - never do mental math. Use the below code.
+        python3 -c "import datetime; print(datetime.datetime.fromtimestamp(TIMESTAMP, tz=datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime('%I:%M %p IST'))"
+
 
         """
-        await ctx.info(f"[get_appointments_basic] Getting basic appointments - page {page_no}")
+        await ctx.info(f"[show_appointments_basic] Getting basic appointments - page {page_no}")
         
         try:
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
-            result = await appointment_service.get_appointments_basic(
+            result = await appointment_service.show_appointments_basic(
                 doctor_id=doctor_id,
                 clinic_id=clinic_id,
                 patient_id=patient_id,
@@ -491,11 +495,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             )
             
             appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
-            await ctx.info(f"[get_appointments_basic] Completed successfully - {appointment_count} appointments\n")
+            await ctx.info(f"[show_appointments_basic] Completed successfully - {appointment_count} appointments\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"[get_appointments_basic] Failed: {e.message}\n")
+            await ctx.error(f"[show_appointments_basic] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

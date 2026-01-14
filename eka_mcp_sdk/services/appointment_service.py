@@ -72,7 +72,7 @@ class AppointmentService:
         """
         return await self.client.book_appointment(appointment_data)
     
-    async def get_appointments_enriched(
+    async def show_appointments_enriched(
         self,
         doctor_id: Optional[str] = None,
         clinic_id: Optional[str] = None,
@@ -101,7 +101,7 @@ class AppointmentService:
             EkaAPIError: If the API call fails
         """
         # Get basic appointments
-        appointments_result = await self.client.get_appointments(
+        appointments_result = await self.client.show_appointments(
             doctor_id=doctor_id,
             clinic_id=clinic_id,
             patient_id=patient_id,
@@ -115,7 +115,7 @@ class AppointmentService:
         
         return enriched_result
     
-    async def get_appointments_basic(
+    async def show_appointments_basic(
         self,
         doctor_id: Optional[str] = None,
         clinic_id: Optional[str] = None,
@@ -141,7 +141,7 @@ class AppointmentService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_appointments(
+        return await self.client.show_appointments(
             doctor_id=doctor_id,
             clinic_id=clinic_id,
             patient_id=patient_id,

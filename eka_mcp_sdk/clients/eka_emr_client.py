@@ -182,7 +182,7 @@ class EkaEMRClient(BaseEkaClient):
             data=appointment_data
         )
     
-    async def get_appointments(
+    async def show_appointments(
         self,
         doctor_id: Optional[str] = None,
         clinic_id: Optional[str] = None,
