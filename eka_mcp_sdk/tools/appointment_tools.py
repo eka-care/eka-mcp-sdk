@@ -23,6 +23,15 @@ from ..utils.enrichment_helpers import (
 
 logger = logging.getLogger(__name__)
 
+from .book_appointment_utils import (
+    check_slot_availability,
+    extract_all_slots_from_schedule,
+    build_appointment_data,
+    create_unavailable_slot_response,
+    fetch_appointment_slots,
+    validate_clinic_schedule
+)
+
 
 def find_alternate_slots(
     all_slots: List[Dict[str, Any]], 
@@ -212,27 +221,18 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
         
         try:
-            # Step 1: Get appointment slots to check availability
+            # Initialize client and service
             token: AccessToken | None = get_access_token()
             client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
             appointment_service = AppointmentService(client)
             
-            # Calculate end_date as start_date + 1
-            start_date_obj = datetime.strptime(booking.date, "%Y-%m-%d")
-            end_date = (start_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
-            
-            await ctx.info(f"[book_appointment] Fetching slots from {booking.date} to {end_date}")
-            slots_result = await appointment_service.get_appointment_slots(
-                booking.doctor_id, 
-                booking.clinic_id, 
-                booking.date, 
-                end_date
+            # Step 1: Fetch appointment slots
+            slots_result = await fetch_appointment_slots(
+                appointment_service, booking.doctor_id, booking.clinic_id, booking.date, ctx
             )
             
-            # Step 2: Parse and check slot availability
-            schedule_data = slots_result.get('data', {}).get('schedule', {})
-            clinic_schedule = schedule_data.get(booking.clinic_id, [])
-            
+            # Step 2: Validate clinic schedule
+            clinic_schedule = validate_clinic_schedule(slots_result, booking.clinic_id)
             if not clinic_schedule:
                 await ctx.error(f"[book_appointment] No schedule found for clinic {booking.clinic_id}")
                 return {
@@ -244,30 +244,14 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     }
                 }
             
-            # Extract all slots from all services
-            all_slots = []
-            for service in clinic_schedule:
-                all_slots.extend(service.get('slots', []))
+            # Step 3: Extract all slots and check availability
+            all_slots = extract_all_slots_from_schedule(clinic_schedule)
+            is_available, requested_slot, alternate_slots = check_slot_availability(
+                all_slots, booking.date, booking.start_time, booking.end_time
+            )
             
-            # Convert requested time to comparable format
-            requested_start = f"{booking.date}T{booking.start_time}"
-            requested_end = f"{booking.date}T{booking.end_time}"
-            
-            # Find the requested slot
-            requested_slot = None
-            for slot in all_slots:
-                slot_start = slot.get('s', '')
-                slot_end = slot.get('e', '')
-                
-                # Normalize to same format (remove timezone for comparison)
-                slot_start_normalized = slot_start.split('+')[0] if '+' in slot_start else slot_start.split('-')[0] if '-' in slot_start and slot_start.count('-') > 2 else slot_start
-                slot_end_normalized = slot_end.split('+')[0] if '+' in slot_end else slot_end.split('-')[0] if '-' in slot_end and slot_end.count('-') > 2 else slot_end
-                
-                if slot_start_normalized.startswith(requested_start) and slot_end_normalized.startswith(requested_end):
-                    requested_slot = slot
-                    break
-            
-            if not requested_slot:
+            # Handle slot not found
+            if requested_slot is None:
                 await ctx.error(f"[book_appointment] Requested time slot not found in schedule")
                 return {
                     "success": False,
@@ -278,63 +262,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     }
                 }
             
-            # Step 3: Check if slot is available
-            if not requested_slot.get('available', False):
-                await ctx.info(f"[book_appointment] Requested slot unavailable, finding alternatives")
-                
-                # Find alternate slots
-                alternate_slots = find_alternate_slots(
-                    all_slots, 
-                    booking.date, 
-                    booking.start_time, 
-                    max_alternatives=6
+            # Handle unavailable slot
+            if not is_available:
+                await ctx.info(f"[book_appointment] Requested slot unavailable, providing alternatives")
+                return create_unavailable_slot_response(
+                    booking.date, booking.start_time, booking.end_time, alternate_slots
                 )
-                
-                response = {
-                    "success": False,
-                    "slot_unavailable": True,
-                    "message": f"The requested time slot {booking.start_time}-{booking.end_time} is not available.",
-                    "requested_slot": {
-                        "date": booking.date,
-                        "start_time": booking.start_time,
-                        "end_time": booking.end_time,
-                        "available": False
-                    },
-                    "alternate_slots": alternate_slots,
-                    "error": {
-                        "message": "Requested slot is already booked",
-                        "status_code": 409,
-                        "error_code": "SLOT_UNAVAILABLE"
-                    }
-                }
-                
-                # Don't cache unavailable slot responses as availability changes
-                return response
             
             # Step 4: Slot is available, proceed with booking
             await ctx.info(f"[book_appointment] Slot available, proceeding with booking")
             
-            # Convert date and time to Unix timestamps
-            date_time_start = datetime.strptime(f"{booking.date} {booking.start_time}", "%Y-%m-%d %H:%M")
-            date_time_end = datetime.strptime(f"{booking.date} {booking.end_time}", "%Y-%m-%d %H:%M")
-            start_timestamp = int(date_time_start.timestamp())
-            end_timestamp = int(date_time_end.timestamp())
-            
-            # Build request body
-            appointment_data = {
-                "clinic_id": booking.clinic_id,
-                "doctor_id": booking.doctor_id,
-                "patient_id": booking.patient_id,
-                "appointment_details": {
-                    "start_time": start_timestamp,
-                    "end_time": end_timestamp,
-                    "mode": booking.mode
-                }
-            }
-            if booking.reason:
-                appointment_data["appointment_details"]["reason"] = booking.reason
-            
+            appointment_data = build_appointment_data(booking)
             await ctx.debug(f"Constructed appointment data: {appointment_data}")
+            
             result = await appointment_service.book_appointment(appointment_data)
             
             appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
@@ -355,6 +295,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     "error_code": e.error_code
                 }
             }
+
         
     @mcp.tool(
         enabled=False,
