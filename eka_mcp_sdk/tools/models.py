@@ -65,7 +65,7 @@ class AppointmentBookingRequest(BaseModel):
     )
     end_time: str = Field(
         None,
-        description="End time in HH:MM 24-hour format (default: start_time + 15 minutes)",
+        description="End time in HH:MM 24-hour format (fetched from slot data if not provided)",
         pattern=r"^\d{2}:\d{2}$",
         examples=["15:30", "12:30"]
     )
@@ -95,25 +95,15 @@ class AppointmentBookingRequest(BaseModel):
                 raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Provided: {v}")
             raise
     
-    @model_validator(mode='after')
-    def set_default_end_time(self) -> 'AppointmentBookingRequest':
-        """Set end_time to start_time + 15 minutes if not provided."""
-        if self.end_time is None and self.start_time:
-            try:
-                # Parse start_time
-                start_dt = datetime.strptime(self.start_time, "%H:%M")
-                # Add 15 minutes
-                end_dt = start_dt + timedelta(minutes=15)
-                # Format back to HH:MM
-                self.end_time = end_dt.strftime("%H:%M")
-            except ValueError:
-                raise ValueError(f"Invalid start_time format: {self.start_time}")
-        
-        # Validate end_time is after start_time
-        if self.end_time and self.start_time:
-            if self.end_time <= self.start_time:
-                raise ValueError(f"End time ({self.end_time}) must be after start time ({self.start_time})")
-        return self
+    @field_validator('end_time')
+    @classmethod
+    def validate_end_after_start(cls, v: str, info) -> str:
+        """Validate that end_time is after start_time."""
+        if v is not None and 'start_time' in info.data:
+            start = info.data['start_time']
+            if v <= start:
+                raise ValueError(f"End time ({v}) must be after start time ({start})")
+        return v
     
     class Config:
         json_schema_extra = {
