@@ -27,7 +27,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
     @mcp.tool(
-        description="It is workspace specific so don't use it for now. Instead refer to list_patients or get_patient_by_mobile.",
         enabled=False,
     )
     async def search_patients(
@@ -80,7 +79,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Get basic patient details by profile ID (profile data only). Consider using get_comprehensive_patient_profile instead for complete information.",
+        enabled=False,
         tags={"patient", "read", "basic", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -128,7 +127,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Get complete patient profile with appointment history. Use for 'show patient details' or viewing appointments.",
         tags={"patient", "read", "appointments"},
         annotations=readonly_tool_annotations()
     )
@@ -241,7 +239,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="List patient profiles by browsing pages when no identifier is known",
         tags={"patient", "read", "list", "browse"},
         annotations=readonly_tool_annotations()
     )
@@ -254,7 +251,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        List all patients with pagination.
+        List all patients with pagination. Prefer get_patient_by_mobile when searching for a specific patient.
         
         Use when the user wants to:
         - browse patients
@@ -292,7 +289,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Update existing patient profile. Use when correcting or adding patient details.",
         tags={"patient", "write", "update"},
         annotations=write_tool_annotations()
     )
@@ -337,7 +333,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Archive a patient profile. Use to hide/remove patient profiles.",
         tags={"patient", "write", "archive", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -374,7 +369,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="Find patient by mobile number. Use this when user provides mobile. Fast and exact match.",
         tags={"patient", "read", "search", "mobile"},
         annotations=readonly_tool_annotations()
     )
@@ -384,13 +378,22 @@ def register_patient_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Find patient by exact mobile number.
+        Find patient by exact mobile number. 
+    
+        CRITICAL: You MUST ask the user for their mobile number before calling this tool.
+        DO NOT call this tool if you don't have the mobile number.
         
         Format: +<country_code><number>
         - India: +919876543210
         - US: +11234567890
         
-        Use when: "Book appointment" → Ask "Your mobile?" → Call this
+        When to use:
+        - User provides their mobile number
+        - User is trying to book appointment → Ask: "What's your mobile number?" → Use this tool
+        - If mobile number not provided or not found, use list_patients instead
+        
+        DO NOT use when:
+        - No mobile number available
         
         Returns: Patient with oid (patient_id)
         """

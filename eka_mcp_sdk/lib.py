@@ -87,8 +87,8 @@ __all__ = [
     # Sync wrapper functions - Appointments
     "get_appointment_slots_sync",
     "book_appointment_sync",
-    "get_appointments_enriched_sync",
-    "get_appointments_basic_sync",
+    "show_appointments_enriched_sync",
+    "show_appointments_basic_sync",
     "get_appointment_details_enriched_sync",
     "get_appointment_details_basic_sync",
     "get_patient_appointments_enriched_sync",
@@ -344,7 +344,7 @@ async def book_appointment_sync(appointment_data: Dict[str, Any]) -> Dict[str, A
     return await service.book_appointment(appointment_data)
 
 @sync_wrapper
-async def get_appointments_enriched_sync(
+async def show_appointments_enriched_sync(
     doctor_id: Optional[str] = None,
     clinic_id: Optional[str] = None,
     patient_id: Optional[str] = None,
@@ -371,12 +371,12 @@ async def get_appointments_enriched_sync(
     """
     client = get_default_client()
     service = AppointmentService(client)
-    return await service.get_appointments_enriched(
+    return await service.show_appointments_enriched(
         doctor_id, clinic_id, patient_id, start_date, end_date, page_no
     )
 
 @sync_wrapper
-async def get_appointments_basic_sync(
+async def show_appointments_basic_sync(
     doctor_id: Optional[str] = None,
     clinic_id: Optional[str] = None,
     patient_id: Optional[str] = None,
@@ -403,7 +403,7 @@ async def get_appointments_basic_sync(
     """
     client = get_default_client()
     service = AppointmentService(client)
-    return await service.get_appointments_basic(
+    return await service.show_appointments_basic(
         doctor_id, clinic_id, patient_id, start_date, end_date, page_no
     )
 

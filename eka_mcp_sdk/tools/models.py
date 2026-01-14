@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 class PatientData(BaseModel):
     fln: str = Field(
@@ -64,8 +64,8 @@ class AppointmentBookingRequest(BaseModel):
         examples=["15:00", "12:00"]
     )
     end_time: str = Field(
-        ...,
-        description="End time in HH:MM 24-hour format (default: start_time + 30 minutes)",
+        None,
+        description="End time in HH:MM 24-hour format (fetched from slot data if not provided)",
         pattern=r"^\d{2}:\d{2}$",
         examples=["15:30", "12:30"]
     )
@@ -99,7 +99,7 @@ class AppointmentBookingRequest(BaseModel):
     @classmethod
     def validate_end_after_start(cls, v: str, info) -> str:
         """Validate that end_time is after start_time."""
-        if 'start_time' in info.data:
+        if v is not None and 'start_time' in info.data:
             start = info.data['start_time']
             if v <= start:
                 raise ValueError(f"End time ({v}) must be after start time ({start})")
