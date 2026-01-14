@@ -178,7 +178,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             - date: YYYY-MM-DD format (e.g., "2025-12-30")
             - start_time: HH:MM 24hr format (e.g., "15:00" for 3pm, "12:00" for noon)
             - end_time: HH:MM 24hr format (e.g., "15:30", "12:30"). 
-                Automatically calculated as start_time + 15 minutes if user does not specify duration
                             
             Optional fields:
             - mode: "INCLINIC" (default), "VIDEO", or "AUDIO"
