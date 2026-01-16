@@ -1,8 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple
 
 from ..tools.models import AppointmentBookingRequest
 from ..services.appointment_service import AppointmentService
+
+# IST timezone offset (+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def find_alternate_slots(
@@ -188,20 +191,26 @@ def check_slot_availability(
 
 def convert_to_timestamps(booking_date: str, start_time: str, end_time: str) -> Tuple[int, int]:
     """
-    Convert date and time strings to Unix timestamps.
+    Convert date and time strings to Unix timestamps in IST.
     
     Args:
         booking_date: Date in YYYY-MM-DD format
-        start_time: Start time in HH:MM format
-        end_time: End time in HH:MM format
+        start_time: Start time in HH:MM format (IST)
+        end_time: End time in HH:MM format (IST)
     
     Returns:
-        Tuple of (start_timestamp, end_timestamp)
+        Tuple of (start_timestamp, end_timestamp) as Unix timestamps
     """
+    # Parse as naive datetime, then attach IST timezone
     date_time_start = datetime.strptime(f"{booking_date} {start_time}", "%Y-%m-%d %H:%M")
     date_time_end = datetime.strptime(f"{booking_date} {end_time}", "%Y-%m-%d %H:%M")
-    start_timestamp = int(date_time_start.timestamp())
-    end_timestamp = int(date_time_end.timestamp())
+    
+    # Make timezone-aware (IST)
+    date_time_start_ist = date_time_start.replace(tzinfo=IST)
+    date_time_end_ist = date_time_end.replace(tzinfo=IST)
+    
+    start_timestamp = int(date_time_start_ist.timestamp())
+    end_timestamp = int(date_time_end_ist.timestamp())
     return start_timestamp, end_timestamp
 
 
