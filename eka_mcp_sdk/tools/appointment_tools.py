@@ -282,7 +282,18 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
             await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
             
-            response = {"success": True, "data": result}
+            # Include actual booked slot times in response
+            booked_slot_info = {
+                "date": booking.date,
+                "start_time": booking.start_time,
+                "end_time": actual_end_time or booking.end_time
+            }
+            
+            response = {
+                "success": True, 
+                "data": result,
+                "booked_slot": booked_slot_info
+            }
             # Cache the successful response
             dedup.cache_response("book_appointment", response, **dedup_params)
             return response
