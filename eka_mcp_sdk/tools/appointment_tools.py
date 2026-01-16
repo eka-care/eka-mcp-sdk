@@ -29,7 +29,8 @@ from ..utils.book_appointment_utils import (
     build_appointment_data,
     create_unavailable_slot_response,
     fetch_appointment_slots,
-    validate_clinic_schedule
+    validate_clinic_schedule,
+    get_slot_end_time
 )
 
 
@@ -271,7 +272,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             # Step 4: Slot is available, proceed with booking
             await ctx.info(f"[book_appointment] Slot available, proceeding with booking")
             
-            appointment_data = build_appointment_data(booking)
+            # Use actual slot end time from schedule (handles 15min, 30min, etc. slots)
+            actual_end_time = get_slot_end_time(requested_slot)
+            appointment_data = build_appointment_data(booking, actual_end_time)
             await ctx.debug(f"Constructed appointment data: {appointment_data}")
             
             result = await appointment_service.book_appointment(appointment_data)

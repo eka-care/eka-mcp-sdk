@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
+from ..tools.models import AppointmentBookingRequest
+from ..services.appointment_service import AppointmentService
+
 
 def find_alternate_slots(
     all_slots: List[Dict[str, Any]], 
@@ -117,32 +120,31 @@ def find_requested_slot(
     all_slots: List[Dict[str, Any]], 
     requested_date: str, 
     requested_start_time: str,
-    requested_end_time: str
+    requested_end_time: str = None  # end_time is now optional, will match by start_time only
 ) -> Optional[Dict[str, Any]]:
     """
-    Find the specific slot that matches the requested time.
+    Find the specific slot that matches the requested start time.
+    Matches by start_time only to handle variable slot durations (15min, 30min, etc.)
     
     Args:
         all_slots: List of all available slots
         requested_date: Date in YYYY-MM-DD format
         requested_start_time: Start time in HH:MM format
-        requested_end_time: End time in HH:MM format
+        requested_end_time: End time in HH:MM format (ignored - kept for backwards compatibility)
     
     Returns:
         The matching slot dict or None if not found
     """
     requested_start = f"{requested_date}T{requested_start_time}"
-    requested_end = f"{requested_date}T{requested_end_time}"
     
     for slot in all_slots:
         slot_start = slot.get('s', '')
-        slot_end = slot.get('e', '')
         
         # Normalize to same format (remove timezone for comparison)
         slot_start_normalized = normalize_slot_time(slot_start)
-        slot_end_normalized = normalize_slot_time(slot_end)
         
-        if slot_start_normalized.startswith(requested_start) and slot_end_normalized.startswith(requested_end):
+        # Match by start time only - slot duration is determined by doctor's schedule
+        if slot_start_normalized.startswith(requested_start):
             return slot
     
     return None
@@ -203,18 +205,22 @@ def convert_to_timestamps(booking_date: str, start_time: str, end_time: str) -> 
     return start_timestamp, end_timestamp
 
 
-def build_appointment_data(booking: 'AppointmentBookingRequest') -> Dict[str, Any]:
+def build_appointment_data(booking: AppointmentBookingRequest, actual_end_time: str = None) -> Dict[str, Any]:
     """
     Build the appointment data structure for API call.
     
     Args:
         booking: AppointmentBookingRequest object
+        actual_end_time: Actual end time from slot (HH:MM format), overrides booking.end_time if provided
     
     Returns:
         Dictionary containing formatted appointment data
     """
+    # Use actual slot end time if provided, otherwise fall back to booking end_time
+    end_time = actual_end_time if actual_end_time else booking.end_time
+    
     start_timestamp, end_timestamp = convert_to_timestamps(
-        booking.date, booking.start_time, booking.end_time
+        booking.date, booking.start_time, end_time
     )
     
     appointment_data = {
@@ -232,6 +238,28 @@ def build_appointment_data(booking: 'AppointmentBookingRequest') -> Dict[str, An
         appointment_data["appointment_details"]["reason"] = booking.reason
     
     return appointment_data
+
+
+def get_slot_end_time(slot: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract end time from slot in HH:MM format.
+    
+    Args:
+        slot: Slot dictionary with 's' (start) and 'e' (end) fields
+    
+    Returns:
+        End time in HH:MM format or None
+    """
+    slot_end = slot.get('e', '')
+    if not slot_end:
+        return None
+    
+    try:
+        slot_end_normalized = normalize_slot_time(slot_end)
+        end_dt = datetime.strptime(slot_end_normalized, "%Y-%m-%dT%H:%M:%S")
+        return end_dt.strftime("%H:%M")
+    except Exception:
+        return None
 
 
 def create_unavailable_slot_response(
@@ -272,11 +300,11 @@ def create_unavailable_slot_response(
 
 
 async def fetch_appointment_slots(
-    appointment_service: 'AppointmentService',
+    appointment_service: AppointmentService,
     doctor_id: str,
     clinic_id: str,
     booking_date: str,
-    ctx: 'Context'
+    ctx
 ) -> Dict[str, Any]:
     """
     Fetch appointment slots for the given date range.
