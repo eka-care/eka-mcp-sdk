@@ -187,6 +187,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         Creates a new patient profile and returns a unique patient identifier.
 
+        - If user hasn't provided any of DOB, gender or name, always ASK them before calling this tool.
+        Do not assume anything for mandatory fields.
+
         Recommended Usage:
         Use when registering a new patient profile with basic demographic information.
         Do not use to update existing patients or modify partial profile data.
@@ -239,23 +242,28 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        description="List all patients with full details (name, DOB, gender, mobile). No need to call get_patient_details for each patient.",
         tags={"patient", "read", "list", "browse"},
         annotations=readonly_tool_annotations()
     )
     async def list_patients(
         page_no: Annotated[int, "Page number (starts from 0)"],
         page_size: Annotated[Optional[int], "Records per page (default: 500, max: 2000)"] = None,
-        select: Annotated[Optional[str], "Additional fields"] = None,
+        select: Annotated[Optional[str], "Additional fields (default: dob,gen for full details)"] = "dob,gen",
         from_timestamp: Annotated[Optional[int], "Filter: created after timestamp"] = None,
         include_archived: Annotated[bool, "Include archived (default: False)"] = False,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        List all patients with pagination. Prefer get_patient_by_mobile when searching for a specific patient.
+        List all patients with pagination. Returns full patient info including DOB and gender.
+        
+        This returns complete patient details - NO need to call get_patient_details_basic 
+        or get_comprehensive_patient_profile for each patient just to see DOB/gender.
         
         Use when the user wants to:
-        - browse patients
+        - browse patients with their full details
         - scroll through patient records
+        - view all patients with DOB, gender, name, mobile
         - refer to themselves without providing an identifier
 
         Do not use when patient identifier (oid) is known.
@@ -263,7 +271,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Trigger Keywords:
         list patients, browse patient records, show all patients, view patient list
         
-        Returns: List with oid (patient_id), fln (full legal name), mobile
+        Returns: List with oid (patient_id), fln (full legal name), mobile, dob, gen (gender)
         """
         await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
         
