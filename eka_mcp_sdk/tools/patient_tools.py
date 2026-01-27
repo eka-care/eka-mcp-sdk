@@ -27,12 +27,14 @@ def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
     @mcp.tool(
-        enabled=False,
+        enabled=True,
+        annotations=readonly_tool_annotations(),
+        tags={"patient", "read", "search"}
     )
     async def search_patients(
         prefix: Annotated[str, "Search prefix to match against patient profiles (username, mobile, or full name)"],
         limit: Annotated[Optional[int], "Maximum number of results to return (default: 50, max: 50)"] = None,
-        select: Annotated[Optional[str], "Comma-separated list of additional fields to include"] = None,
+        select: Annotated[Optional[str], "Comma-separated list of additional fields to include (dob, gen) as needed by the client"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -45,7 +47,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         This tool is workspace-scoped and optimized for prefix-based searches.
         
         For general patient lookup, use:
-        - list_patients: View all patients with pagination
+        - list_patients: View all patients with pagination, **Do not use this for search**
         - get_patient_by_mobile: Find by exact mobile number
 
         Trigger Keywords
@@ -242,7 +244,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        description="List all patients with full details (name, DOB, gender, mobile). No need to call get_patient_details for each patient.",
         tags={"patient", "read", "list", "browse"},
         annotations=readonly_tool_annotations()
     )
@@ -257,8 +258,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
         List all patients with pagination. Returns full patient info including DOB and gender.
         
-        This returns complete patient details - NO need to call get_patient_details_basic 
-        or get_comprehensive_patient_profile for each patient just to see DOB/gender.
+        This returns complete patient details - NO need to call get_comprehensive_patient_profile 
+        for each patient just to see DOB/gender. 
+        Search patients using search_patients or get_patient_by_mobile instead.
         
         Use when the user wants to:
         - browse patients with their full details

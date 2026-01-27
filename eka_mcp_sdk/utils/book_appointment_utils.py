@@ -316,7 +316,8 @@ async def fetch_appointment_slots(
     ctx
 ) -> Dict[str, Any]:
     """
-    Fetch appointment slots for the given date range.
+    Fetch appointment slots for the given date.
+    Uses ISO 8601 datetime format with time bounds for precise day filtering.
     
     Args:
         appointment_service: The appointment service instance
@@ -328,14 +329,15 @@ async def fetch_appointment_slots(
     Returns:
         Dictionary containing slots data
     """
-    # Calculate end_date as start_date + 1
-    start_date_obj = datetime.strptime(booking_date, "%Y-%m-%d")
-    end_date = (start_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
+    # Convert date to ISO 8601 timestamps with time bounds for the specific day
+    # Start of day: 00:00:00.000Z, End of day: 23:59:59.000Z
+    start_datetime = f"{booking_date}T00:00:00.000Z"
+    end_datetime = f"{booking_date}T23:59:59.000Z"
     
-    await ctx.info(f"[fetch_appointment_slots] Fetching slots from {booking_date} to {end_date}")
+    await ctx.info(f"[fetch_appointment_slots] Fetching slots from {start_datetime} to {end_datetime}")
     
     slots_result = await appointment_service.get_appointment_slots(
-        doctor_id, clinic_id, booking_date, end_date
+        doctor_id, clinic_id, start_datetime, end_datetime
     )
     
     return slots_result
