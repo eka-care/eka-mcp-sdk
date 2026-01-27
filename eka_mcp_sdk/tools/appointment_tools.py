@@ -122,30 +122,29 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     async def get_appointment_slots(
         doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
         clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
-        start_date: Annotated[str, "Start date YYYY-MM-DD"],
-        end_date: Annotated[str, "End date YYYY-MM-DD (must be start_date + 1)"],
+        start_date: Annotated[str, "Start of FIRST day in ISO format: YYYY-MM-DDT00:00:00.000Z"],
+        end_date: Annotated[str, "End of LAST day in ISO format: YYYY-MM-DDT23:59:59.000Z"],
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Retrieve available appointment time slots for a specific doctor at a given clinic within a limited date range (same day or next day).
+        Retrieve available appointment slots for a doctor. Supports multi-day ranges in a SINGLE call.
+
+        CRITICAL: Call this tool ONCE for date ranges, NOT multiple times for each day.
+        
+        ISO 8601 format examples:
+        - Single day (Jan 27): start=2026-01-27T00:00:00.000Z, end=2026-01-27T23:59:59.000Z
+        - Multi-day (Jan 29 to Feb 2): start=2026-01-29T00:00:00.000Z, end=2026-02-02T23:59:59.000Z
+        - This week: start=2026-01-27T00:00:00.000Z, end=2026-02-02T23:59:59.000Z
 
         When to Use This Tool
-        Use this tool when the user wants to check availability before booking an appointment, rescheduling, or exploring alternative times. 
-        This tool must be called before attempting to book an appointment. When searching set end_date as (start_date +1) 
-        Only valid for short-range availability checks (today or tomorrow).
-        If that specific time slot is booked then there is conflict and another booking CANNOT BE MADE NO MATTER WHAT.
+        Use when user wants to check availability before booking.
+        Must be called before attempting to book an appointment.
 
-        Constraints:
-        - Date range must be D to D+1 only. (D is start_date)
-        - Requires valid doctor_id and clinic_id from get_business_entities.
-
-        Trigger Keywords / Phrases
-        available slots, check availability, when can I book, is the doctor free, 
-        appointments today / tomorrow, book at noon / morning / afternoon, what times are open
+        Trigger Keywords
+        available slots, check availability, when can I book, is the doctor free,
+        slots for this week, slots from X to Y date
  
-        What to Return
-        Returns a list of appointment slots with start_time, end_time, and available (boolean).        
-        If no slots are available, returns an empty slots array. Do not attempt booking within this tool.
+        Returns: List of slots with start_time, end_time, and available (boolean).
 
         """
         await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} from {start_date} to {end_date}")
