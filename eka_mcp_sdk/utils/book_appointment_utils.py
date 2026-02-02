@@ -361,3 +361,130 @@ def validate_clinic_schedule(slots_result: Dict[str, Any], clinic_id: str) -> Op
         return None
     
     return clinic_schedule
+
+
+def parse_eka_slots_to_contract(
+    slots_result: Dict[str, Any],
+    clinic_id: str,
+    date: str,
+    doctor_id: str
+) -> Dict[str, Any]:
+    """
+    Parse Eka API slot response into unified contract format.
+    
+    Args:
+        slots_result: Raw response from Eka appointment slots API
+        clinic_id: Clinic identifier
+        date: Date string (YYYY-MM-DD)
+        doctor_id: Doctor identifier
+    
+    Returns:
+        Unified contract format dict
+    """
+    schedule_data = slots_result.get('data', {}).get('schedule', {})
+    clinic_schedule = schedule_data.get(clinic_id, [])
+    
+    all_slots: List[str] = []
+    slot_categories: List[Dict[str, Any]] = []
+    pricing: Dict[str, Any] = {}
+    interval_minutes: Optional[int] = None
+    
+    for service in clinic_schedule:
+        service_name = service.get('service_name', 'Consultation')
+        category_slots: List[str] = []
+        
+        # Extract pricing from first service
+        if not pricing:
+            if service.get('fee'):
+                pricing['consultation_fee'] = service.get('fee')
+            if service.get('registration_fee'):
+                pricing['registration_fee'] = service.get('registration_fee')
+            if pricing:
+                pricing['currency'] = 'INR'
+        
+        for slot in service.get('slots', []):
+            if slot.get('available', False):
+                slot_start = slot.get('s', '')
+                
+                if slot_start:
+                    time_str = extract_time_24h(slot_start)
+                    if time_str:
+                        all_slots.append(time_str)
+                        category_slots.append(time_str)
+                        
+                        # Calculate interval from first two slots
+                        if interval_minutes is None and len(all_slots) >= 2:
+                            interval_minutes = calculate_interval(all_slots[0], all_slots[1])
+        
+        # Add category if has slots
+        if category_slots:
+            slot_categories.append({
+                "category": service_name.lower().replace(' ', '_'),
+                "slots": sorted(category_slots)
+            })
+    
+    # Sort all slots
+    all_slots = sorted(set(all_slots))
+    
+    # Build response
+    response: Dict[str, Any] = {
+        "date": date,
+        "doctor_id": doctor_id,
+        "clinic_id": clinic_id,
+        "all_slots": all_slots
+    }
+    
+    # Add optional fields
+    if interval_minutes:
+        response["slot_config"] = {"interval_minutes": interval_minutes}
+    
+    if slot_categories:
+        response["slot_categories"] = slot_categories
+    
+    if pricing:
+        response["pricing"] = pricing
+    
+    response["metadata"] = {}
+    
+    return response
+
+
+def extract_time_24h(iso_datetime: str) -> Optional[str]:
+    """
+    Extract HH:MM time from ISO datetime string.
+    
+    Args:
+        iso_datetime: ISO format string (e.g., "2026-01-13T14:15:00+05:30")
+    
+    Returns:
+        Time string in HH:MM format or None
+    """
+    if not iso_datetime:
+        return None
+    
+    try:
+        clean_str = iso_datetime.split('+')[0] if '+' in iso_datetime else iso_datetime
+        dt = datetime.strptime(clean_str, "%Y-%m-%dT%H:%M:%S")
+        return dt.strftime("%H:%M")
+    except (ValueError, AttributeError):
+        return None
+
+
+def calculate_interval(time1: str, time2: str) -> Optional[int]:
+    """
+    Calculate interval in minutes between two HH:MM time strings.
+    
+    Args:
+        time1: First time (HH:MM)
+        time2: Second time (HH:MM)
+    
+    Returns:
+        Interval in minutes or None
+    """
+    try:
+        t1 = datetime.strptime(time1, "%H:%M")
+        t2 = datetime.strptime(time2, "%H:%M")
+        diff = int((t2 - t1).total_seconds() / 60)
+        return diff if diff > 0 else None
+    except (ValueError, AttributeError):
+        return None

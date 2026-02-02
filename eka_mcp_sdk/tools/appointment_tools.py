@@ -30,9 +30,9 @@ from ..utils.book_appointment_utils import (
     create_unavailable_slot_response,
     fetch_appointment_slots,
     validate_clinic_schedule,
-    get_slot_end_time
+    get_slot_end_time,
+    parse_eka_slots_to_contract
 )
-
 
 def find_alternate_slots(
     all_slots: List[Dict[str, Any]], 
@@ -168,6 +168,181 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     "status_code": e.status_code,
                     "error_code": e.error_code
                 }
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "read", "dates", "availability"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_available_dates(
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        start_date: Annotated[Optional[str], "Start date YYYY-MM-DD (default: tomorrow). Must be today or future."] = None,
+        max_days: Annotated[int, "Maximum number of dates to return (default: 7, max: 10)"] = 7,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get available appointment dates for a doctor at a clinic.
+        
+        Returns dates that have at least one available slot within the specified range.
+        Use this tool to show users which dates have availability before drilling into specific slots.
+        
+        Behavior:
+        - If no start_date: Returns dates starting from tomorrow
+        - If start_date < today: Returns error (past dates not allowed)
+        - Max 10 dates returned (default: 7)
+        
+        Trigger Keywords:
+        available dates, when is doctor free, which days available, appointment dates,
+        doctor availability dates, open dates
+        
+        Returns:
+            List of dates (YYYY-MM-DD) with available slots
+        """
+        await ctx.info(f"[get_available_dates] Getting available dates for doctor {doctor_id} at clinic {clinic_id}")
+        
+        try:
+            # Determine start date
+            today = datetime.now().date()
+            tomorrow = today + timedelta(days=1)
+            
+            if start_date:
+                try:
+                    parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+                    if parsed_start < today:
+                        return {
+                            "error": f"Start date '{start_date}' is in the past. Please provide a date >= {today.strftime('%Y-%m-%d')}"
+                        }
+                    effective_start = parsed_start
+                except ValueError:
+                    return {
+                        "error": f"Invalid date format '{start_date}'. Use YYYY-MM-DD format."
+                    }
+            else:
+                effective_start = tomorrow
+            
+            # Cap max_days at 10
+            max_days = min(max_days, 10)
+            
+            # Calculate date range
+            end_date_calc = effective_start + timedelta(days=max_days - 1)
+            
+            # Format dates for API call (ISO 8601)
+            start_datetime = f"{effective_start.strftime('%Y-%m-%d')}T00:00:00.000Z"
+            end_datetime = f"{end_date_calc.strftime('%Y-%m-%d')}T23:59:59.000Z"
+            
+            await ctx.debug(f"Fetching slots from {start_datetime} to {end_datetime}")
+            
+            token: AccessToken | None = get_access_token()
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            appointment_service = AppointmentService(client)
+            
+            # Fetch slots for the date range
+            slots_result = await appointment_service.get_appointment_slots(
+                doctor_id, clinic_id, start_datetime, end_datetime
+            )
+            
+            # Extract dates with available slots
+            available_dates = set()
+            schedule_data = slots_result.get('data', {}).get('schedule', {})
+            clinic_schedule = schedule_data.get(clinic_id, [])
+            
+            for service in clinic_schedule:
+                for slot in service.get('slots', []):
+                    if slot.get('available', False):
+                        slot_start = slot.get('s', '')
+                        if slot_start:
+                            # Extract date from slot start time
+                            try:
+                                slot_date = slot_start.split('T')[0]
+                                available_dates.add(slot_date)
+                            except Exception:
+                                continue
+            
+            # Sort dates and limit to max_days
+            sorted_dates = sorted(list(available_dates))[:max_days]
+            
+            await ctx.info(f"[get_available_dates] Found {len(sorted_dates)} dates with availability\n")
+            
+            return {
+                "available_dates": sorted_dates,
+                "date_range": {
+                    "start": effective_start.strftime('%Y-%m-%d'),
+                    "end": end_date_calc.strftime('%Y-%m-%d')
+                }
+            }
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[get_available_dates] Failed: {e.message}\n")
+            return {
+                "error": e.message
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "read", "slots", "availability"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_available_slots(
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        date: Annotated[str, "Date to check slots for (YYYY-MM-DD format)"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get available time slots for a specific date.
+        
+        Simple slot lookup for a single day. Returns available slots in unified contract format.
+        Use after get_available_dates to show specific time options.
+        
+        Trigger Keywords:
+        available slots, time slots, what times available, appointment times,
+        slots on [date], openings on [date]
+        
+        Returns:
+            Unified contract with all_slots (24h format), slot_categories, pricing, metadata
+        """
+        await ctx.info(f"[get_available_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
+        
+        try:
+            # Validate date format and not in past
+            today = datetime.now().date()
+            try:
+                parsed_date = datetime.strptime(date, "%Y-%m-%d").date()
+                if parsed_date < today:
+                    return {
+                        "error": f"Date '{date}' is in the past. Please provide a date >= {today.strftime('%Y-%m-%d')}"
+                    }
+            except ValueError:
+                return {
+                    "error": f"Invalid date format '{date}'. Use YYYY-MM-DD format."
+                }
+            
+            # Format for API call
+            start_datetime = f"{date}T00:00:00.000Z"
+            end_datetime = f"{date}T23:59:59.000Z"
+            
+            token: AccessToken | None = get_access_token()
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            appointment_service = AppointmentService(client)
+            
+            # Fetch slots
+            slots_result = await appointment_service.get_appointment_slots(
+                doctor_id, clinic_id, start_datetime, end_datetime
+            )
+            
+            # Parse Eka response into common contract format
+            response_data = parse_eka_slots_to_contract(
+                slots_result, clinic_id, date, doctor_id
+            )
+            
+            await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
+            
+            return response_data
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[get_available_slots] Failed: {e.message}\n")
+            return {
+                "error": e.message
             }
     
     @mcp.tool(
