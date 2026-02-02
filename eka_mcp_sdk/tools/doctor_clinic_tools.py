@@ -12,6 +12,14 @@ from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.doctor_clinic_service import DoctorClinicService
 from ..utils.tool_registration import get_extra_headers
+from ..services.appointment_service import AppointmentService
+from ..utils.doctor_discovery_utils import (
+    find_doctor_clinics,
+    resolve_hospital_id,
+    fetch_doctor_availability,
+    build_doctor_details_for_card,
+    build_elicitation_response
+)
 
 logger = logging.getLogger(__name__)
 
@@ -453,4 +461,91 @@ async def _enrich_clinic_appointments(client: EkaEMRClient, appointments_data: D
         logger.warning(f"Failed to enrich clinic appointments: {str(e)}")
         return []
 
+### DOCTOR DISCOVERY / Availability TOOLS ###
 
+def register_discovery_tools(mcp: FastMCP) -> None:
+    """Register Doctor Availability Elicitation MCP tools."""
+    
+    @mcp.tool(
+        tags={"doctor", "availability", "elicitation"},
+        annotations=readonly_tool_annotations()
+    )
+    async def doctor_availability_elicitation(
+        doctor_id: Annotated[str, "Doctor ID (mandatory)"],
+        hospital_id: Annotated[Optional[str], "Hospital/Clinic ID (optional, if known)"] = None,
+        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format"] = None,
+        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Elicit doctor availability for appointment booking.
+        
+        Flow:
+        1. Fetch doctor details
+        2. Validate/resolve hospital (if provided & matches, use it; else return all doctor's hospitals)
+        3. Fetch available dates (check if preferred_date is available)
+        4. Fetch available slots (check if preferred_slot_time is available)
+        
+        Trigger Keywords:
+        check availability, doctor available, when can I book, appointment slots,
+        available times for doctor
+        
+        Returns:
+            UI component format (doctor_card) with availability and callbacks
+        """
+        await ctx.info(f"[doctor_availability_elicitation] doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            doctor_clinic_service = DoctorClinicService(client)
+            appointment_service = AppointmentService(client)
+            
+            # 1. Fetch doctor profile
+            try:
+                doctor_profile = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
+            except EkaAPIError:
+                return {"error": f"Doctor with ID '{doctor_id}' not found"}
+            
+            # 2. Get doctor's clinics from business entities
+            # Response structure: { "success": true, "data": { "clinics": [...], "doctors": [...] } }
+            entities_response = await doctor_clinic_service.get_business_entities()
+            entities_data = entities_response.get('data', entities_response)
+            clinics_list = entities_data.get('clinics', [])
+            
+            # Find clinics where this doctor works (clinics contain doctor IDs)
+            doctor_clinics = find_doctor_clinics(clinics_list, doctor_id)
+            
+            # 3. Resolve hospital
+            resolved_hospital_id = resolve_hospital_id(doctor_clinics, hospital_id)
+            
+            # 4. Build doctor entry
+            doctor_entry: Dict[str, Any] = {"doctor_id": doctor_id}
+            if resolved_hospital_id:
+                doctor_entry["hospital_id"] = resolved_hospital_id
+            if preferred_date:
+                doctor_entry["date_preference"] = preferred_date
+            if preferred_slot_time:
+                doctor_entry["slot_preference"] = preferred_slot_time
+            
+            # 5. Fetch availability
+            if resolved_hospital_id:
+                availability_list, selected_date = await fetch_doctor_availability(
+                    appointment_service, doctor_id, resolved_hospital_id,
+                    preferred_date, preferred_slot_time
+                )
+                if availability_list:
+                    doctor_entry["availability"] = availability_list
+                if selected_date:
+                    doctor_entry["selected_date"] = selected_date
+            
+            # 6. Build and return response
+            doctor_details = build_doctor_details_for_card(doctor_profile, doctor_clinics)
+            response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+            
+            await ctx.info(f"[doctor_availability_elicitation] Completed\n")
+            return response
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[doctor_availability_elicitation] Failed: {e.message}\n")
+            return {"error": e.message}
