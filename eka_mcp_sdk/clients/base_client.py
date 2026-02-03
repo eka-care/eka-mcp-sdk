@@ -25,13 +25,15 @@ class BaseEkaClient(ABC):
         self,
         method: str,
         endpoint: str,
+        api_base_url: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make authenticated request to Eka.care API."""
         # Get current settings and initialize url for exception handling
         settings = EkaSettings()
-        url = f"{settings.api_base_url}{endpoint}"
+        api_base = api_base_url or settings.api_base_url
+        url = f"{api_base}{endpoint}"
         headers = {}
         
         try:
@@ -87,6 +89,9 @@ class BaseEkaClient(ABC):
             # Handle 204 No Content or empty responses
             if response.status_code == 204 or not response.text:
                 return {"success": True, "status_code": response.status_code}
+            
+            if headers.get("Accept") == "application/x-protobuf":
+                return response.content
             
             try:
                 response_data = response.json()

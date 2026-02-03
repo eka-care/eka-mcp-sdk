@@ -41,3 +41,9 @@ class EkaSettings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
     
+    # Workspace Configuration
+    workspace_client_type: str = Field(
+        default="ekaemr",
+        description="Workspace client type: ekaemr, moolchand, ekap"
+    )
+    
