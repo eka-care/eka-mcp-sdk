@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from datetime import datetime, timedelta
-from unittest import result
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
@@ -14,25 +13,17 @@ from ..auth.models import EkaAPIError
 from ..services.appointment_service import AppointmentService
 from .models import AppointmentBookingRequest
 from ..utils.tool_registration import get_extra_headers
+from ..utils.workspace_utils import get_workspace_id
 from ..utils.enrichment_helpers import (
     get_cached_data,
     extract_patient_summary,
     extract_doctor_summary,
     extract_clinic_summary
 )
+from ..clients.client_factory import EMRClientFactory
 
 logger = logging.getLogger(__name__)
 
-from ..utils.book_appointment_utils import (
-    check_slot_availability,
-    extract_all_slots_from_schedule,
-    build_appointment_data,
-    create_unavailable_slot_response,
-    fetch_appointment_slots,
-    validate_clinic_schedule,
-    get_slot_end_time,
-    parse_eka_slots_to_contract
-)
 
 def find_alternate_slots(
     all_slots: List[Dict[str, Any]], 
@@ -151,7 +142,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
             
@@ -234,38 +230,26 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             await ctx.debug(f"Fetching slots from {start_datetime} to {end_datetime}")
             
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             
-            # Fetch slots for the date range
-            slots_result = await appointment_service.get_appointment_slots(
+            # Fetch available dates - client returns common format
+            result = await appointment_service.get_available_dates(
                 doctor_id, clinic_id, start_datetime, end_datetime
             )
             
-            # Extract dates with available slots
-            available_dates = set()
-            schedule_data = slots_result.get('data', {}).get('schedule', {})
-            clinic_schedule = schedule_data.get(clinic_id, [])
+            # Limit to max_days
+            available_dates = result.get('available_dates', [])[:max_days]
             
-            for service in clinic_schedule:
-                for slot in service.get('slots', []):
-                    if slot.get('available', False):
-                        slot_start = slot.get('s', '')
-                        if slot_start:
-                            # Extract date from slot start time
-                            try:
-                                slot_date = slot_start.split('T')[0]
-                                available_dates.add(slot_date)
-                            except Exception:
-                                continue
-            
-            # Sort dates and limit to max_days
-            sorted_dates = sorted(list(available_dates))[:max_days]
-            
-            await ctx.info(f"[get_available_dates] Found {len(sorted_dates)} dates with availability\n")
+            await ctx.info(f"[get_available_dates] Found {len(available_dates)} dates with availability\n")
             
             return {
-                "available_dates": sorted_dates,
+                "available_dates": available_dates,
                 "date_range": {
                     "start": effective_start.strftime('%Y-%m-%d'),
                     "end": end_date_calc.strftime('%Y-%m-%d')
@@ -317,22 +301,18 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                     "error": f"Invalid date format '{date}'. Use YYYY-MM-DD format."
                 }
             
-            # Format for API call
-            start_datetime = f"{date}T00:00:00.000Z"
-            end_datetime = f"{date}T23:59:59.000Z"
-            
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             
-            # Fetch slots
-            slots_result = await appointment_service.get_appointment_slots(
-                doctor_id, clinic_id, start_datetime, end_datetime
-            )
-            
-            # Parse Eka response into common contract format
-            response_data = parse_eka_slots_to_contract(
-                slots_result, clinic_id, date, doctor_id
+            # Fetch slots - client returns common contract format
+            response_data = await appointment_service.get_available_slots(
+                doctor_id, clinic_id, date
             )
             
             await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
@@ -372,7 +352,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         - If slot available: Returns booking confirmation with appointment_id
         - If slot unavailable: Returns alternate slot suggestions (up to 6 nearest slots)
         """
-        # Convert Pydantic model to dict for deduplication and API call
+        # Convert Pydantic model to dict for deduplication
         booking_dict = booking.model_dump(exclude_none=True)
         
         # Check for duplicate request
@@ -391,86 +371,41 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             await ctx.info("DUPLICATE REQUEST - Returning cached appointment response")
             return cached_response
         
-        await ctx.info(f"[book_appointment] Checking availability for patient {booking.patient_id}")
+        await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
         
         try:
-            # Initialize client and service
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
-            appointment_service = AppointmentService(client)
-            
-            # Step 1: Fetch appointment slots
-            slots_result = await fetch_appointment_slots(
-                appointment_service, booking.doctor_id, booking.clinic_id, booking.date, ctx
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
             )
             
-            # Step 2: Validate clinic schedule
-            clinic_schedule = validate_clinic_schedule(slots_result, booking.clinic_id)
-            if not clinic_schedule:
-                await ctx.error(f"[book_appointment] No schedule found for clinic {booking.clinic_id}")
-                return {
-                    "success": False,
-                    "error": {
-                        "message": "No appointment schedule available for this clinic",
-                        "status_code": 404,
-                        "error_code": "NO_SCHEDULE"
-                    }
-                }
-            
-            # Step 3: Extract all slots and check availability
-            all_slots = extract_all_slots_from_schedule(clinic_schedule)
-            is_available, requested_slot, alternate_slots = check_slot_availability(
-                all_slots, booking.date, booking.start_time, booking.end_time
+            # Delegate to client - all orchestration logic is in the client layer
+            result = await client.book_appointment_with_validation(
+                patient_id=booking.patient_id,
+                doctor_id=booking.doctor_id,
+                clinic_id=booking.clinic_id,
+                date=booking.date,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                mode=booking.mode,
+                reason=booking.reason
             )
             
-            # Handle slot not found
-            if requested_slot is None:
-                await ctx.error(f"[book_appointment] Requested time slot not found in schedule")
-                return {
-                    "success": False,
-                    "error": {
-                        "message": f"Time slot {booking.start_time}-{booking.end_time} not found in doctor's schedule",
-                        "status_code": 404,
-                        "error_code": "SLOT_NOT_FOUND"
-                    }
-                }
+            if result.get("success"):
+                appointment_id = result.get('data', {}).get('appointment_id') or result.get('data', {}).get('id')
+                await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
+                # Cache the successful response
+                dedup.cache_response("book_appointment", result, **dedup_params)
+            elif result.get("slot_unavailable"):
+                await ctx.info(f"[book_appointment] Slot unavailable, returning alternatives\n")
+            else:
+                await ctx.error(f"[book_appointment] Failed: {result.get('error', {}).get('message')}\n")
             
-            # Handle unavailable slot
-            if not is_available:
-                await ctx.info(f"[book_appointment] Requested slot unavailable, providing alternatives")
-                return create_unavailable_slot_response(
-                    booking.date, booking.start_time, booking.end_time, alternate_slots
-                )
-            
-            # Step 4: Slot is available, proceed with booking
-            await ctx.info(f"[book_appointment] Slot available, proceeding with booking")
-            
-            # Use actual slot end time from schedule (handles 15min, 30min, etc. slots)
-            actual_end_time = get_slot_end_time(requested_slot)
-            appointment_data = build_appointment_data(booking, actual_end_time)
-            await ctx.debug(f"Constructed appointment data: {appointment_data}")
-            
-            result = await appointment_service.book_appointment(appointment_data)
-            
-            appointment_id = result.get('appointment_id') or result.get('appointmentId') or result.get('id')
-            await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
-            
-            # Include actual booked slot times in response
-            booked_slot_info = {
-                "date": booking.date,
-                "start_time": booking.start_time,
-                "end_time": actual_end_time or booking.end_time
-            }
-            
-            response = {
-                "success": True, 
-                "data": result,
-                "booked_slot": booked_slot_info
-            }
-            # Cache the successful response
-            dedup.cache_response("book_appointment", response, **dedup_params)
-            return response
+            return result
             
         except EkaAPIError as e:
             await ctx.error(f"[book_appointment] Failed: {e.message}\n")
@@ -528,7 +463,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.show_appointments_enriched(
                 doctor_id=doctor_id,
@@ -591,7 +531,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.show_appointments_basic(
                 doctor_id=doctor_id,
@@ -648,7 +593,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
             
@@ -694,7 +644,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
             
@@ -742,7 +697,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
             
@@ -796,7 +756,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
             
@@ -847,7 +812,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
             
@@ -895,7 +865,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.complete_appointment(appointment_id, completion_data)
             
@@ -941,7 +916,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
             
@@ -990,7 +970,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             appointment_service = AppointmentService(client)
             result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
             

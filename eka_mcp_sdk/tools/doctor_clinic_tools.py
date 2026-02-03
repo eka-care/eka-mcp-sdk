@@ -13,13 +13,8 @@ from ..auth.models import EkaAPIError
 from ..services.doctor_clinic_service import DoctorClinicService
 from ..utils.tool_registration import get_extra_headers
 from ..services.appointment_service import AppointmentService
-from ..utils.doctor_discovery_utils import (
-    find_doctor_clinics,
-    resolve_hospital_id,
-    fetch_doctor_availability,
-    build_doctor_details_for_card,
-    build_elicitation_response
-)
+from ..utils.workspace_utils import get_workspace_id
+from ..clients.client_factory import EMRClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +46,14 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         await ctx.info(f"[get_business_entities] Getting business entities (clinics and doctors)")
         
         try:
+            
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_business_entities()
             
@@ -97,7 +98,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
             
@@ -140,7 +146,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_clinic_details_basic(clinic_id)
             
@@ -184,7 +195,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_doctor_services(doctor_id)
             
@@ -237,7 +253,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_doctor_profile(
                 doctor_id, include_clinics, include_services, include_recent_appointments, appointment_limit
@@ -288,7 +309,12 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             doctor_clinic_service = DoctorClinicService(client)
             result = await doctor_clinic_service.get_comprehensive_clinic_profile(
                 clinic_id, include_doctors, include_services, include_recent_appointments, appointment_limit
@@ -497,54 +523,23 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         
         try:
             token: AccessToken | None = get_access_token()
-            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
-            doctor_clinic_service = DoctorClinicService(client)
-            appointment_service = AppointmentService(client)
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
             
-            # 1. Fetch doctor profile
-            try:
-                doctor_profile = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
-            except EkaAPIError:
-                return {"error": f"Doctor with ID '{doctor_id}' not found"}
-            
-            # 2. Get doctor's clinics from business entities
-            # Response structure: { "success": true, "data": { "clinics": [...], "doctors": [...] } }
-            entities_response = await doctor_clinic_service.get_business_entities()
-            entities_data = entities_response.get('data', entities_response)
-            clinics_list = entities_data.get('clinics', [])
-            
-            # Find clinics where this doctor works (clinics contain doctor IDs)
-            doctor_clinics = find_doctor_clinics(clinics_list, doctor_id)
-            
-            # 3. Resolve hospital
-            resolved_hospital_id = resolve_hospital_id(doctor_clinics, hospital_id)
-            
-            # 4. Build doctor entry
-            doctor_entry: Dict[str, Any] = {"doctor_id": doctor_id}
-            if resolved_hospital_id:
-                doctor_entry["hospital_id"] = resolved_hospital_id
-            if preferred_date:
-                doctor_entry["date_preference"] = preferred_date
-            if preferred_slot_time:
-                doctor_entry["slot_preference"] = preferred_slot_time
-            
-            # 5. Fetch availability
-            if resolved_hospital_id:
-                availability_list, selected_date = await fetch_doctor_availability(
-                    appointment_service, doctor_id, resolved_hospital_id,
-                    preferred_date, preferred_slot_time
-                )
-                if availability_list:
-                    doctor_entry["availability"] = availability_list
-                if selected_date:
-                    doctor_entry["selected_date"] = selected_date
-            
-            # 6. Build and return response
-            doctor_details = build_doctor_details_for_card(doctor_profile, doctor_clinics)
-            response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+            # Delegate to client - all orchestration logic is in the client layer
+            result = await client.doctor_availability_elicitation(
+                doctor_id=doctor_id,
+                clinic_id=hospital_id,
+                preferred_date=preferred_date,
+                preferred_slot_time=preferred_slot_time
+            )
             
             await ctx.info(f"[doctor_availability_elicitation] Completed\n")
-            return response
+            return result
             
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation] Failed: {e.message}\n")

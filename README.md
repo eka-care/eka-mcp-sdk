@@ -164,30 +164,44 @@ get_patient_records(
 
 ## Building Hosted Solutions
 
-This SDK is designed to be modular and reusable. You can import components from their respective modules to build more complex hosted MCP solutions:
+This SDK supports **multi-tenant workspace routing** where different clients (Eka, Moolchand, etc.) can use the same tools with their own API implementations.
 
-```python
-# Import foundational components from their original modules
-from eka_mcp_sdk.auth.models import AuthContext, EkaAPIError
-from eka_mcp_sdk.clients.base_client import BaseEkaClient
-from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
+### Architecture
 
-# Import service classes for business logic
-from eka_mcp_sdk.services import (
-    PatientService,
-    AppointmentService,
-    PrescriptionService,
-    DoctorClinicService
-)
-
-# Use these components in your hosted MCP implementation
+```
+Tools (client-agnostic) → Services → Client (all orchestration + API calls)
+                                       ↑
+                              EMRClientFactory.create_client(workspace_id)
 ```
 
-This makes it easy to:
-- Add multi-tenant capabilities
-- Implement custom authentication flows  
-- Build workspace isolation
-- Add additional API modules
+### Creating a New Client
+
+**1. Implement `BaseEMRClient`:**
+
+```python
+# eka_mcp_sdk/clients/moolchand_client.py
+from .base_emr_client import BaseEMRClient
+
+class MoolchandClient(BaseEMRClient):
+    def get_workspace_name(self) -> str:
+        return "moolchand"
+    
+    # Implement all abstract methods with your API logic
+    async def doctor_availability_elicitation(self, ...): ...
+    async def book_appointment_with_validation(self, ...): ...
+```
+
+**2. Configure via environment:**
+
+```env
+# Map workspace IDs to client classes (JSON format)
+WORKSPACE_CLIENT_DICT={"moolchand": "eka_mcp_sdk.clients.moolchand_client.MoolchandClient"}
+
+# Default workspace when no header present
+EKA_WORKSPACE_CLIENT_TYPE=ekaemr
+```
+
+**3. Workspace routing** happens automatically via `x-eka-jwt-payload` header containing `w-id`.
 
 ## Development
 
