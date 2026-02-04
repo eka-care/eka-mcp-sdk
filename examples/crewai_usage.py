@@ -31,7 +31,7 @@ except ImportError:
 
 from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.auth.models import EkaAPIError
-from eka_mcp_sdk.config.settings import EkaSettings
+from eka_mcp_sdk.config.settings import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -225,7 +225,6 @@ async def demo_healthcare_workflow():
     print("="*60)
     
     # Verify configuration
-    settings = EkaSettings()
     if not settings.client_id:
         print("❌ Missing EKA_CLIENT_ID in configuration")
         return
@@ -373,7 +372,6 @@ async def main():
         return
     
     # Check configuration
-    settings = EkaSettings()
     if not settings.client_id:
         print("⚠️  EKA_CLIENT_ID not configured. Please update your .env file.")
         return

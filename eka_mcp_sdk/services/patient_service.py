@@ -113,12 +113,13 @@ class PatientService:
         
         return comprehensive_profile
     
-    async def add_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def add_patient(self, patient_data: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a new patient profile.
         
         Args:
             patient_data: Patient information including required and optional fields
+            auth_token: Optional authentication token (for clients that require it)
             
         Returns:
             Created patient profile with oid identifier
@@ -126,7 +127,7 @@ class PatientService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.add_patient(patient_data)
+        return await self.client.add_patient(patient_data, auth_token)
     
     async def list_patients(
         self,
@@ -199,7 +200,8 @@ class PatientService:
     async def get_patient_by_mobile(
         self,
         mobile: str,
-        full_profile: bool = False
+        full_profile: bool = False,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Retrieve patient profiles by mobile number.
@@ -207,6 +209,7 @@ class PatientService:
         Args:
             mobile: Mobile number in format +<country_code><number>
             full_profile: If True, returns full patient profile details
+            auth_token: Optional authentication token (for clients that require it)
             
         Returns:
             Patient profile(s) matching the mobile number
@@ -214,7 +217,32 @@ class PatientService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_patient_by_mobile(mobile, full_profile)
+        return await self.client.get_patient_by_mobile(mobile, full_profile, auth_token)
+    
+    async def send_mobile_verification_otp(self, mobile_number: str) -> Dict[str, Any]:
+        """
+        Send OTP to mobile number for verification.
+        
+        Args:
+            mobile_number: Mobile number to send OTP to
+            
+        Returns:
+            Response indicating OTP sent status
+        """
+        return await self.client.send_mobile_verification_otp(mobile_number)
+    
+    async def verify_mobile_otp(self, mobile_number: str, otp: str) -> Dict[str, Any]:
+        """
+        Verify OTP for mobile number.
+        
+        Args:
+            mobile_number: Mobile number that received OTP
+            otp: OTP code to verify
+            
+        Returns:
+            Response indicating verification status
+        """
+        return await self.client.verify_mobile_otp(mobile_number, otp)
     
     async def _enrich_patient_appointments(
         self, 

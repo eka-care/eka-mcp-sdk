@@ -13,7 +13,6 @@ from ..utils.enrichment_helpers import (
     get_cached_data, 
     extract_patient_summary, 
     extract_doctor_summary, 
-    extract_clinic_summary
 )
 
 logger = logging.getLogger(__name__)
@@ -43,12 +42,13 @@ class DoctorClinicService:
         """
         return await self.client.get_business_entities()
     
-    async def get_doctor_profile_basic(self, doctor_id: str) -> Dict[str, Any]:
+    async def get_doctor_profile_basic(self, doctor_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Get basic doctor profile information (profile data only).
         
         Args:
             doctor_id: Doctor's unique identifier
+            auth_token: Optional authentication token (for clients that require it)
             
         Returns:
             Basic doctor profile including specialties, contact info, and background only
@@ -56,7 +56,7 @@ class DoctorClinicService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_doctor_profile(doctor_id)
+        return await self.client.get_doctor_profile(doctor_id, auth_token)
     
     async def get_clinic_details_basic(self, clinic_id: str) -> Dict[str, Any]:
         """
@@ -105,6 +105,31 @@ class DoctorClinicService:
         """
         return await self.client.doctor_availability_elicitation(
             doctor_id, clinic_id, preferred_date, preferred_slot_time
+        )
+    
+    async def doctor_discovery(
+        self,
+        auth_token: str,
+        doctor_name: Optional[str] = None,
+        specialty: Optional[str] = None,
+        city: Optional[str] = None,
+        gender: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for doctors by various criteria.
+        
+        Args:
+            auth_token: Authentication token
+            doctor_name: Filter by doctor name
+            specialty: Filter by specialty
+            city: Filter by city
+            gender: Filter by gender
+            
+        Returns:
+            List of matching doctors
+        """
+        return await self.client.doctor_discovery(
+            auth_token, doctor_name, specialty, city, gender
         )
     
     async def get_comprehensive_doctor_profile(

@@ -37,7 +37,8 @@ class EkaEMRClient(BaseEMRClient):
     # Patient Management APIs
     async def add_patient(
         self,
-        patient_data: Dict[str, Any]
+        patient_data: Dict[str, Any],
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a patient profile."""
         return await self._make_request(
@@ -126,7 +127,8 @@ class EkaEMRClient(BaseEMRClient):
     async def get_patient_by_mobile(
         self,
         mobile: str,
-        full_profile: bool = False
+        full_profile: bool = False,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """Retrieve patient profiles by mobile number."""
         params = {"mob": mobile}
@@ -183,7 +185,8 @@ class EkaEMRClient(BaseEMRClient):
     
     async def get_doctor_profile(
         self,
-        doctor_id: str
+        doctor_id: str,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get Doctor profile in common contract format.
@@ -263,7 +266,8 @@ class EkaEMRClient(BaseEMRClient):
         doctor_id: str,
         clinic_id: str,
         start_date: str,
-        end_date: str
+        end_date: str,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get available appointment dates in common contract format.
@@ -284,7 +288,8 @@ class EkaEMRClient(BaseEMRClient):
         self,
         doctor_id: str,
         clinic_id: str,
-        date: str
+        date: str,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get available slots for a specific date in common contract format.
@@ -454,7 +459,8 @@ class EkaEMRClient(BaseEMRClient):
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.

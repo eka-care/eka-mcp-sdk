@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 import logging
 
-from ..config.settings import EkaSettings
+from ..config.settings import settings
 from .models import TokenResponse, AuthContext, EkaAPIError
 from .storage import FileTokenStorage
 
@@ -18,7 +18,7 @@ class AuthenticationManager:
         self._refresh_token: Optional[str] = None
         self._external_access_token = access_token
         self._http_client = httpx.AsyncClient(timeout=30.0)
-        self._settings = EkaSettings()
+        self._settings = settings
         
         # Only use storage when not using external access token
         logger.debug(f"AuthenticationManager initialized with {'external' if access_token else 'client credentials'} authentication")

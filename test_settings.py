@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from eka_mcp_sdk.config.settings import EkaSettings
+from eka_mcp_sdk.config.settings import settings
 
 print("Current working directory:", os.getcwd())
 print("Environment variables with EKA_ prefix:")
@@ -11,7 +11,6 @@ for key, value in os.environ.items():
 
 print("\nTrying to load settings...")
 try:
-    settings = EkaSettings()
     print("Settings loaded successfully!")
     print(f"Client ID: {settings.eka_client_id}")
     print(f"Client Secret: {settings.eka_client_secret[:10]}...")

@@ -79,6 +79,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     )
     async def get_doctor_profile_basic(
         doctor_id: Annotated[str, "Doctor UUID"],
+        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -105,7 +106,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
-            result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id)
+            result = await doctor_clinic_service.get_doctor_profile_basic(doctor_id, auth_token)
             
             await ctx.info(f"[get_doctor_profile_basic] Completed successfully\n")
             
@@ -544,3 +545,63 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation] Failed: {e.message}\n")
             return {"error": e.message}
+
+    @mcp.tool(
+        tags={"doctor", "search", "discovery"},
+        annotations=readonly_tool_annotations()
+    )
+    async def doctor_discovery_tool(
+        doctor_name: Annotated[Optional[str], "Filter by doctor name"] = None,
+        specialty: Annotated[Optional[str], "Filter by specialty (e.g., Cardiologist, Dermatologist)"] = None,
+        city: Annotated[Optional[str], "Filter by city"] = None,
+        gender: Annotated[Optional[str], "Filter by gender (male/female)"] = None,
+        auth_token: Annotated[Optional[str], "auth token is mandatory for moolchand hospitals related services"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Search for doctors by various criteria.
+        
+        Use this tool to discover doctors based on name, specialty, city, or gender.
+        At least one filter should be provided.
+        
+        Trigger Keywords:
+        find doctor, search doctor, doctors near me, cardiologist in delhi,
+        female doctor, doctor by specialty
+        
+        Returns:
+            List of matching doctors with their details
+        """
+        await ctx.info(f"[doctor_discovery_tool] Searching - name: {doctor_name}, specialty: {specialty}, city: {city}, gender: {gender}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            doctor_clinic_service = DoctorClinicService(client)
+            
+            result = await doctor_clinic_service.doctor_discovery(
+                auth_token=auth_token,
+                doctor_name=doctor_name,
+                specialty=specialty,
+                city=city,
+                gender=gender,
+            )
+            
+            doctor_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[doctor_discovery_tool] Found {doctor_count} doctors\n")
+            return {"success": True, "data": result}
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[doctor_discovery_tool] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }

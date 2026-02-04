@@ -19,7 +19,7 @@ import logging
 
 from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
 from eka_mcp_sdk.auth.models import EkaAPIError
-from eka_mcp_sdk.config.settings import EkaSettings
+from eka_mcp_sdk.config.settings import settings
 
 # Configure logging
 logging.basicConfig(
@@ -178,7 +178,6 @@ async def demo_settings_configuration():
     print("\n⚙️  SETTINGS CONFIGURATION")
     
     # Show current settings
-    settings = EkaSettings()
     print(f"API Base URL: {settings.api_base_url}")
     print(f"Client ID: {settings.client_id}")
     print(f"Client Secret: {'***' if settings.client_secret else 'Not set'}")

@@ -201,6 +201,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
 )
     async def add_patient(
         patient_data: PatientData,
+        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -245,7 +246,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.add_patient(patient_dict)  
+            result = await patient_service.add_patient(patient_dict, auth_token)  
             
             patient_id = result.get('oid') if isinstance(result, dict) else None
             await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
@@ -422,6 +423,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],
         full_profile: Annotated[bool, "Return full profile if True (default: False)"] = False,
+        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -453,9 +455,95 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.get_patient_by_mobile(mobile, full_profile)
+            result = await patient_service.get_patient_by_mobile(mobile, full_profile, auth_token)
             return {"success": True, "data": result}
         except EkaAPIError as e:
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+    @mcp.tool(
+        tags={"patient", "auth", "otp", "verification"},
+        annotations=write_tool_annotations()
+    )
+    async def send_mobile_verification_otp(
+        mobile_number: Annotated[str, "Mobile number with country code: +919876543210"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Send OTP to mobile number for verification.
+        
+        Use this tool when verifying a patient's mobile number before registration or lookup.
+        
+        Format: +<country_code><number>
+        - India: +919876543210
+        
+        Returns: Response indicating OTP sent status
+        """
+        await ctx.info(f"[send_mobile_verification_otp] Sending OTP to: {mobile_number}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.send_mobile_verification_otp(mobile_number)
+            
+            await ctx.info(f"[send_mobile_verification_otp] OTP sent successfully\n")
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[send_mobile_verification_otp] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+    @mcp.tool(
+        tags={"patient", "auth", "otp", "verification"},
+        annotations=write_tool_annotations()
+    )
+    async def verify_mobile_otp(
+        mobile_number: Annotated[str, "Mobile number with country code: +919876543210"],
+        otp: Annotated[str, "OTP code received on mobile"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Verify OTP for mobile number.
+        
+        Use after send_mobile_verification_otp to complete verification.
+        
+        Returns: Response indicating verification status
+        """
+        await ctx.info(f"[verify_mobile_otp] Verifying OTP for: {mobile_number}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = EMRClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.verify_mobile_otp(mobile_number, otp)
+            
+            await ctx.info(f"[verify_mobile_otp] Verification completed\n")
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[verify_mobile_otp] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

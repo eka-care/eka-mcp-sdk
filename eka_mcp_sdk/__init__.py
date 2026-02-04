@@ -33,7 +33,7 @@ For building remote MCP servers, import from their respective modules:
     from eka_mcp_sdk.auth.manager import AuthenticationManager
     from eka_mcp_sdk.clients.base_client import BaseEkaClient
     from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
-    from eka_mcp_sdk.config.settings import EkaSettings
+    from eka_mcp_sdk.config.settings import EkaSettings, settings
 """
 
 __version__ = "0.1.0"

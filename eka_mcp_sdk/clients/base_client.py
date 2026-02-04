@@ -5,7 +5,7 @@ import logging
 
 from ..auth.manager import AuthenticationManager
 from ..auth.models import EkaAPIError
-from ..config.settings import EkaSettings
+from ..config.settings import settings
 from ..utils.logger_utils import _build_curl_command
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ class BaseEkaClient(ABC):
     ) -> Dict[str, Any]:
         """Make authenticated request to Eka.care API."""
         # Get current settings and initialize url for exception handling
-        settings = EkaSettings()
         api_base = api_base_url or settings.api_base_url
         url = f"{api_base}{endpoint}"
         headers = {}

@@ -11,7 +11,7 @@ Example usage for building a remote MCP server:
     from eka_mcp_sdk.auth.manager import AuthenticationManager
     from eka_mcp_sdk.clients.base_client import BaseEkaClient
     from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
-    from eka_mcp_sdk.config.settings import EkaSettings
+    from eka_mcp_sdk.config.settings import settings
 
 Example usage for direct service access:
 
@@ -33,7 +33,7 @@ from ..auth.models import TokenResponse, AuthContext, EkaAPIError
 from ..auth.manager import AuthenticationManager
 from ..clients.base_client import BaseEkaClient
 from ..clients.eka_emr_client import EkaEMRClient
-from ..config.settings import EkaSettings
+from ..config.settings import settings
 
 # Import service classes
 from .patient_service import PatientService
@@ -49,7 +49,7 @@ __all__ = [
     "AuthenticationManager",
     "BaseEkaClient",
     "EkaEMRClient",
-    "EkaSettings",
+    "settings",
     # Service classes
     "PatientService",
     "AppointmentService",
