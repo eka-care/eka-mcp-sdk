@@ -1,13 +1,12 @@
-import asyncio
+import os
+import json
 import argparse
 import logging
-from typing import Optional
 from fastmcp import FastMCP
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
 
-from eka_mcp_sdk.config.settings import EkaSettings
-from eka_mcp_sdk.sdk import EkaMCPSDK
+from eka_mcp_sdk.config.settings import settings
 from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,6 @@ def create_mcp_server() -> FastMCP:
             Answer practice related questions such as patient demographics, appointment history, prescription history, etc.
         """)
     
-    settings = EkaSettings()
     
     @mcp.tool()
     async def get_server_info(ctx: Context = CurrentContext()) -> dict:
@@ -50,6 +48,45 @@ def create_mcp_server() -> FastMCP:
     
     # Register all tool modules
     register_doctor_tools(mcp)
+
+    # Properly wrap _list_tools to add workspace filtering
+    # We need to preserve the original method's signature and self binding
+    from eka_mcp_sdk.utils.workspace_utils import get_workspace_id
+    import functools
+    
+    # Get the original unbound method
+    original_list_tools = FastMCP._list_tools
+    
+    @functools.wraps(original_list_tools)
+    async def workspace_filtered_list_tools(*args, **kwargs):
+        """Wrapper that filters tools based on workspace from headers."""
+        # Call the original method to get all tools
+        all_tools = await original_list_tools(*args, **kwargs)
+        
+        # Apply workspace filtering
+        try:
+            workspace_id = get_workspace_id() or "ekaemr"
+            WORKSPACE_TOOLS_DICT = settings.workspace_tools_dict
+            if WORKSPACE_TOOLS_DICT is str:
+                WORKSPACE_TOOLS_DICT = json.loads(WORKSPACE_TOOLS_DICT)
+
+            allowed_tool_names = set(WORKSPACE_TOOLS_DICT.get(workspace_id))
+
+            # Filter tools to only those allowed for this workspace
+            filtered_tools = [
+                tool for tool in all_tools 
+                if tool.name in allowed_tool_names
+            ]
+            
+            logger.info(f"Workspace '{workspace_id}': Listed {len(filtered_tools)}/{len(all_tools)} tools")
+            return filtered_tools
+        except Exception as e:
+            logger.warning(f"Error filtering tools by workspace: {e}, returning all tools")
+            return all_tools
+    
+    # Bind the wrapper as a method on the mcp instance
+    import types
+    mcp._list_tools = types.MethodType(workspace_filtered_list_tools, mcp)
     
     return mcp
 

@@ -297,8 +297,7 @@ Total: 7 | Passed: 4 | Failed: 0 | Skipped: 3
 ```bash
 # Fixed in storage.py - make sure you have latest code
 # The import should be:
-from ..config.settings import EkaSettings
-settings = EkaSettings()
+from ..config.settings import settings
 ```
 
 ### Token Refresh Failed

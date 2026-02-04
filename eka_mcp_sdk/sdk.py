@@ -5,7 +5,7 @@ Main SDK class for Eka.care MCP integration.
 from typing import Optional
 import logging
 
-from .config.settings import EkaSettings
+from .config.settings import settings
 from .auth.manager import AuthenticationManager
 from .clients.eka_emr_client import EkaEMRClient
 
@@ -35,7 +35,6 @@ class EkaMCPSDK:
         """
         # Set parameters with fallbacks to settings
         
-        settings = EkaSettings()
         self.client_id = client_id or settings.eka_client_id
         self.client_secret = client_secret or settings.eka_client_secret
         self.api_key = api_key or settings.eka_api_key

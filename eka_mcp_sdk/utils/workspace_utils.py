@@ -4,17 +4,12 @@ Workspace utilities for detecting and routing requests to correct EMR clients.
 
 import json
 import logging
-import os
 
 from fastmcp.server.dependencies import get_http_headers
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-
-
-WORKSPCE_ID_TO_WORKSPACE_NAME_DICT = os.environ.get("WORKSPCE_ID_TO_WORKSPACE_NAME")
-
-WORKSPCE_ID_TO_WORKSPACE_NAME_DICT = json.loads(WORKSPCE_ID_TO_WORKSPACE_NAME_DICT) if WORKSPCE_ID_TO_WORKSPACE_NAME_DICT is str else {}
 
 def get_workspace_id() -> str:
     """
@@ -36,9 +31,13 @@ def get_workspace_id() -> str:
         
         jwt_payload = json.loads(jwt_payload_str)
         workspace_id = jwt_payload.get("w-id", "ekaemr")
+
+        WORKSPACE_ID_TO_WORKSPACE_NAME_DICT = settings.workspace_id_to_workspace_name_dict
+        if WORKSPACE_ID_TO_WORKSPACE_NAME_DICT is str:
+            WORKSPACE_ID_TO_WORKSPACE_NAME_DICT = json.loads(WORKSPACE_ID_TO_WORKSPACE_NAME_DICT) 
         
         logger.debug(f"Detected workspace: {workspace_id}")
-        return WORKSPCE_ID_TO_WORKSPACE_NAME_DICT.get(workspace_id, "ekaemr")
+        return WORKSPACE_ID_TO_WORKSPACE_NAME_DICT.get(workspace_id, "ekaemr")
         
     except json.JSONDecodeError as e:
         logger.warning(f"Failed to parse x-eka-jwt-payload header: {e}")

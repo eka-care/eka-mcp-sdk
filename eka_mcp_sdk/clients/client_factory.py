@@ -4,13 +4,11 @@ EMR Client Factory.
 Creates workspace-specific EMR clients based on workspace ID from request headers.
 """
 
-import json
 import logging
-import os
 from typing import Optional, Dict
 
 from .eka_emr_client import EkaEMRClient
-
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +16,10 @@ logger = logging.getLogger(__name__)
 class EMRClientFactory:
     """Factory for creating workspace-specific EMR clients."""
     
-    # Mapping of workspace IDs to their client classes
-    # Default workspace type can be configured via EKA_WORKSPACE_CLIENT_TYPE env variable
-    WORKSPACE_CLIENT_DICT = os.environ.get("WORKSPACE_CLIENT_DICT")
-    WORKSPACE_CLIENT_DICT = json.loads(WORKSPACE_CLIENT_DICT) if WORKSPACE_CLIENT_DICT else {}
-    
     @classmethod
     def _get_default_client_type(cls) -> str:
         """Get default client type from environment settings."""
         try:
-            from ..config.settings import EkaSettings
-            settings = EkaSettings()
             return settings.workspace_client_type.lower()
         except Exception:
             return "ekaemr"
@@ -53,7 +44,7 @@ class EMRClientFactory:
         """
         workspace_id = workspace_id.lower() if workspace_id else "ekaemr"
         
-        client_class = cls.WORKSPACE_CLIENT_DICT.get(workspace_id, EkaEMRClient)
+        client_class = settings.get_client_class(workspace_id) or EkaEMRClient
         
         logger.debug(f"Creating {client_class.__name__} for workspace: {workspace_id}")
         
@@ -62,4 +53,4 @@ class EMRClientFactory:
     @classmethod
     def get_supported_workspaces(cls) -> list:
         """Return list of supported workspace IDs."""
-        return [ws for ws in cls.WORKSPACE_CLIENT_DICT.keys()]
+        return [ws for ws in settings.workspace_client_dict.keys()]
