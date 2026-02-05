@@ -784,14 +784,10 @@ class EkaEMRClient(BaseEMRClient):
         """Not implemented for EkaEMRClient."""
         return {"error": "Not implemented", "message": "get_appointments is not available for this workspace"}
     
+    def mobile_number_verification(self, *args, **kwargs) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "mobile_number_verification is not available for this workspace"}
+    
     def get_workspace_name(self) -> str:
         """Return workspace name for EkaEMRClient."""
         return "ekaemr"
-    
-    async def send_mobile_verification_otp(self, *args, **kwargs) -> Dict[str, Any]:
-        """Not implemented for EkaEMRClient."""
-        return {"error": "Not implemented", "message": "send_mobile_verification_otp is not available for this workspace"}
-    
-    async def verify_mobile_otp(self, *args, **kwargs) -> Dict[str, Any]:
-        """Not implemented for EkaEMRClient."""
-        return {"error": "Not implemented", "message": "verify_mobile_otp is not available for this workspace"}

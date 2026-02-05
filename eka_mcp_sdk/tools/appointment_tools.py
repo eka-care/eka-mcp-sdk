@@ -385,9 +385,10 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             client = EMRClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
+            appointment_service = AppointmentService(client)
             
             # Delegate to client - all orchestration logic is in the client layer
-            result = await client.book_appointment_with_validation(
+            result = await appointment_service.book_appointment_with_validation(
                 patient_id=booking.patient_id,
                 doctor_id=booking.doctor_id,
                 clinic_id=booking.clinic_id,
