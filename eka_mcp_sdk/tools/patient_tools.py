@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, List, Annotated
+from typing import Any, Dict, Optional, List, Annotated, Literal
 import logging
 from eka_mcp_sdk.tools.models import PatientData
 from fastmcp import FastMCP
@@ -471,63 +471,38 @@ def register_patient_tools(mcp: FastMCP) -> None:
         tags={"patient", "auth", "otp", "verification"},
         annotations=write_tool_annotations()
     )
-    async def send_mobile_verification_otp(
-        mobile_number: Annotated[str, "Mobile number with country code: +919876543210"],
+    async def mobile_number_verification(
+        mobile_number: Annotated[str, "Mobile number to verify (10 digits without country code)"],
+        otp: Annotated[Optional[str], "One-Time Password sent to the mobile number"] = None,
+        stage: Annotated[Literal["send_otp", "verify_otp"], "Stage of verification"] = "send_otp",
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Send OTP to mobile number for verification.
+        Unified mobile number verification - handles both OTP send and verify stages.
         
-        Use this tool when verifying a patient's mobile number before registration or lookup.
+        Use this tool for verifying a patient's mobile number:
+        - Stage 1 (send_otp): Send OTP to the mobile number
+        - Stage 2 (verify_otp): Verify the OTP received by the patient
         
-        Format: +<country_code><number>
-        - India: +919876543210
+        Args:
+            mobile_number: 10-digit mobile number without country code (e.g., "9876543210")
+            otp: OTP code received on mobile (required only for verify_otp stage)
+            stage: "send_otp" to send OTP, "verify_otp" to verify received OTP
         
-        Returns: Response indicating OTP sent status
+        Returns: Response indicating OTP sent/verification status
         """
-        await ctx.info(f"[send_mobile_verification_otp] Sending OTP to: {mobile_number}")
+        stage_display = "Sending OTP" if stage == "send_otp" else "Verifying OTP"
+        await ctx.info(f"[mobile_number_verification] {stage_display} for: {mobile_number}")
         
-        try:
-            token: AccessToken | None = get_access_token()
-            access_token = token.token if token else None
-            workspace_id = get_workspace_id()
-            custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
-                workspace_id, access_token, custom_headers
-            )
-            patient_service = PatientService(client)
-            result = await patient_service.send_mobile_verification_otp(mobile_number)
-            
-            await ctx.info(f"[send_mobile_verification_otp] OTP sent successfully\n")
-            return {"success": True, "data": result}
-        except EkaAPIError as e:
-            await ctx.error(f"[send_mobile_verification_otp] Failed: {e.message}\n")
+        # Validate OTP is provided for verify stage
+        if stage == "verify_otp" and not otp:
             return {
                 "success": False,
                 "error": {
-                    "message": e.message,
-                    "status_code": e.status_code,
-                    "error_code": e.error_code
+                    "message": "OTP is required for verify_otp stage",
+                    "error_code": "MISSING_OTP"
                 }
             }
-
-    @mcp.tool(
-        tags={"patient", "auth", "otp", "verification"},
-        annotations=write_tool_annotations()
-    )
-    async def verify_mobile_otp(
-        mobile_number: Annotated[str, "Mobile number with country code: +919876543210"],
-        otp: Annotated[str, "OTP code received on mobile"],
-        ctx: Context = CurrentContext()
-    ) -> Dict[str, Any]:
-        """
-        Verify OTP for mobile number.
-        
-        Use after send_mobile_verification_otp to complete verification.
-        
-        Returns: Response indicating verification status
-        """
-        await ctx.info(f"[verify_mobile_otp] Verifying OTP for: {mobile_number}")
         
         try:
             token: AccessToken | None = get_access_token()
@@ -538,12 +513,13 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.verify_mobile_otp(mobile_number, otp)
+            result = await patient_service.mobile_number_verification(mobile_number, otp, stage)
             
-            await ctx.info(f"[verify_mobile_otp] Verification completed\n")
+            success_msg = "OTP sent successfully" if stage == "send_otp" else "Verification completed"
+            await ctx.info(f"[mobile_number_verification] {success_msg}\n")
             return {"success": True, "data": result}
         except EkaAPIError as e:
-            await ctx.error(f"[verify_mobile_otp] Failed: {e.message}\n")
+            await ctx.error(f"[mobile_number_verification] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

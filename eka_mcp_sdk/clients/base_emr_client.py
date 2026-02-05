@@ -23,17 +23,16 @@ class BaseEMRClient(BaseEkaClient):
     
     # ==================== Patient Operations ====================
     
-    
-    @abstractmethod
-    async def send_mobile_verification_otp(self, mobile_number: str) -> Dict[str, Any]:
-        """Send OTP to mobile number."""
+    async def mobile_number_verification(
+        self,
+        mobile_number: str,
+        otp: Optional[str] = None,
+        stage: str = "send_otp"
+    ) -> Dict[str, Any]:
+        """
+        Unified mobile number verification - handles both OTP send and verify stages.
+        """
         pass
-    
-    @abstractmethod
-    async def verify_mobile_otp(self, mobile_number: str, otp: str) -> Dict[str, Any]:
-        """Verify OTP for mobile number."""
-        pass
-
     
     @abstractmethod
     async def add_patient(self, patient_data: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:

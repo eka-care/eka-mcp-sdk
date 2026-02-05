@@ -219,30 +219,24 @@ class PatientService:
         """
         return await self.client.get_patient_by_mobile(mobile, full_profile, auth_token)
     
-    async def send_mobile_verification_otp(self, mobile_number: str) -> Dict[str, Any]:
+    async def mobile_number_verification(
+        self,
+        mobile_number: str,
+        otp: Optional[str] = None,
+        stage: str = "send_otp"
+    ) -> Dict[str, Any]:
         """
-        Send OTP to mobile number for verification.
+        Unified mobile number verification - handles both OTP send and verify stages.
         
         Args:
-            mobile_number: Mobile number to send OTP to
+            mobile_number: Mobile number to verify (10 digits without country code)
+            otp: One-Time Password (required for verify_otp stage)
+            stage: "send_otp" to send OTP, "verify_otp" to verify
             
         Returns:
-            Response indicating OTP sent status
+            Response indicating OTP sent/verification status
         """
-        return await self.client.send_mobile_verification_otp(mobile_number)
-    
-    async def verify_mobile_otp(self, mobile_number: str, otp: str) -> Dict[str, Any]:
-        """
-        Verify OTP for mobile number.
-        
-        Args:
-            mobile_number: Mobile number that received OTP
-            otp: OTP code to verify
-            
-        Returns:
-            Response indicating verification status
-        """
-        return await self.client.verify_mobile_otp(mobile_number, otp)
+        return await self.client.mobile_number_verification(mobile_number, otp, stage)
     
     async def _enrich_patient_appointments(
         self, 
