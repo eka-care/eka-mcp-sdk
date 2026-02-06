@@ -238,6 +238,33 @@ class PatientService:
         """
         return await self.client.mobile_number_verification(mobile_number, otp, stage)
     
+    async def list_all_patient_profiles(self) -> Dict[str, Any]:
+        """
+        Retrieve all patient profiles.
+        
+        Returns:
+            List of all patient profiles
+            
+        Raises:
+            EkaAPIError: If the API call fails
+        """
+        return await self.client.list_all_patient_profiles()
+    
+    async def get_patient_vitals(self, patient_id: str) -> Dict[str, Any]:
+        """
+        Retrieve patient vitals.
+        
+        Args:
+            patient_id: Patient's unique identifier
+            
+        Returns:
+            Patient vitals data
+            
+        Raises:
+            EkaAPIError: If the API call fails
+        """
+        return await self.client.get_patient_vitals(patient_id)
+    
     async def _enrich_patient_appointments(
         self, 
         appointments_data: Dict[str, Any]
