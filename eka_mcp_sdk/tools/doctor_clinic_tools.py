@@ -14,7 +14,7 @@ from ..services.doctor_clinic_service import DoctorClinicService
 from ..utils.tool_registration import get_extra_headers
 from ..services.appointment_service import AppointmentService
 from ..utils.workspace_utils import get_workspace_id
-from ..clients.client_factory import EMRClientFactory
+from ..clients.client_factory import ClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -102,7 +102,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -150,7 +150,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -199,7 +199,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -257,7 +257,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -313,7 +313,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
@@ -527,7 +527,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             
@@ -578,7 +578,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)

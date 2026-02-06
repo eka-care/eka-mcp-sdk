@@ -788,6 +788,14 @@ class EkaEMRClient(BaseEMRClient):
         """Not implemented for EkaEMRClient."""
         return {"error": "Not implemented", "message": "mobile_number_verification is not available for this workspace"}
     
+    async def list_all_patient_profiles(self) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "list_all_patient_profiles is not available for this workspace"}
+    
+    async def get_patient_vitals(self, patient_id: str) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "get_patient_vitals is not available for this workspace"}
+    
     def get_workspace_name(self) -> str:
         """Return workspace name for EkaEMRClient."""
         return "ekaemr"

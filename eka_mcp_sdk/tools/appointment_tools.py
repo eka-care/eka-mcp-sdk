@@ -20,7 +20,7 @@ from ..utils.enrichment_helpers import (
     extract_doctor_summary,
     extract_clinic_summary
 )
-from ..clients.client_factory import EMRClientFactory
+from ..clients.client_factory import ClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -234,7 +234,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -307,7 +307,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -382,7 +382,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -471,7 +471,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -539,7 +539,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -601,7 +601,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -652,7 +652,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -705,7 +705,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -764,7 +764,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -820,7 +820,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -873,7 +873,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -924,7 +924,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
@@ -978,7 +978,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)

@@ -171,7 +171,7 @@ This SDK supports **multi-tenant workspace routing** where different clients (Ek
 ```
 Tools (client-agnostic) → Services → Client (all orchestration + API calls)
                                        ↑
-                              EMRClientFactory.create_client(workspace_id)
+                              ClientFactory.create_client(workspace_id)
 ```
 
 ### Creating a New Client

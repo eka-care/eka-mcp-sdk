@@ -15,7 +15,7 @@ from ..utils.enrichment_helpers import (
     get_appointment_status_info
 )
 from ..utils.workspace_utils import get_workspace_id
-from ..clients.client_factory import EMRClientFactory
+from ..clients.client_factory import ClientFactory
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
@@ -66,7 +66,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -120,7 +120,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -173,7 +173,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -242,7 +242,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -305,7 +305,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -355,7 +355,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -400,7 +400,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -451,7 +451,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -509,7 +509,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
-            client = EMRClientFactory.create_client(
+            client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
@@ -520,6 +520,90 @@ def register_patient_tools(mcp: FastMCP) -> None:
             return {"success": True, "data": result}
         except EkaAPIError as e:
             await ctx.error(f"[mobile_number_verification] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+    @mcp.tool(
+        tags={"patient", "profile", "list"},
+        annotations=readonly_tool_annotations()
+    )
+    async def list_all_patient_profiles(
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve all patient profiles.
+        
+        Use this tool to get a complete list of all patient profiles in the system.
+        
+        Returns: List of all patient profiles with their details
+        """
+        await ctx.info("[list_all_patient_profiles] Fetching all patient profiles")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.list_all_patient_profiles()
+            
+            await ctx.info(f"[list_all_patient_profiles] Retrieved patient profiles\n")
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[list_all_patient_profiles] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+    @mcp.tool(
+        tags={"patient", "vitals", "health"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_patient_vitals(
+        patient_id: Annotated[str, "Patient's unique identifier (oid)"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve patient vitals.
+        
+        Use this tool to get vital signs and health metrics for a specific patient.
+        
+        Args:
+            patient_id: The unique identifier of the patient
+        
+        Returns: Patient vitals data including health metrics
+        """
+        await ctx.info(f"[get_patient_vitals] Fetching vitals for patient: {patient_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.get_patient_vitals(patient_id)
+            
+            await ctx.info(f"[get_patient_vitals] Retrieved vitals successfully\n")
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_patient_vitals] Failed: {e.message}\n")
             return {
                 "success": False,
                 "error": {

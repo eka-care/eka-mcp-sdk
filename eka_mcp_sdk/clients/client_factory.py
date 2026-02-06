@@ -13,7 +13,7 @@ from ..config.settings import settings
 logger = logging.getLogger(__name__)
 
 
-class EMRClientFactory:
+class ClientFactory:
     """Factory for creating workspace-specific EMR clients."""
     
     @classmethod
