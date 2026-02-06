@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
-from ..utils.fastmcp_helper import readonly_tool_annotations 
+from ..utils.fastmcp_helper import readonly_tool_annotations, elicitation_response
 
 from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
@@ -497,6 +497,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         tags={"doctor", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )
+    @elicitation_response
     async def doctor_availability_elicitation(
         doctor_id: Annotated[str, "Doctor ID (mandatory)"],
         hospital_id: Annotated[Optional[str], "Hospital/Clinic ID (optional, if known)"] = None,

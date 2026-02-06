@@ -5,7 +5,32 @@ According to FastMCP documentation, when readOnlyHint=True, destructiveHint
 is automatically False and doesn't need explicit setting.
 """
 
+from functools import wraps
+from typing import Callable, Any, Dict
 from mcp.types import ToolAnnotations
+
+
+def elicitation_response(func: Callable) -> Callable:
+    """Decorator to mark a tool response as requiring elicitation.
+    
+    Adds 'is_elicitation': True to the response dict, indicating that
+    the response requires user input or confirmation before proceeding.
+    
+    Usage:
+        @mcp.tool(...)
+        @elicitation_response
+        async def my_tool(...) -> Dict[str, Any]:
+            return {"data": ...}
+        
+        # Result: {"data": ..., "is_elicitation": True}
+    """
+    @wraps(func)
+    async def wrapper(*args, **kwargs) -> Dict[str, Any]:
+        result = await func(*args, **kwargs)
+        if isinstance(result, dict):
+            result["is_elicitation"] = True
+        return result
+    return wrapper
 
 
 def readonly_tool_annotations(*, open_world: bool = False) -> ToolAnnotations:
