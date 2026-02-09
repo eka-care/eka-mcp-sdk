@@ -27,13 +27,14 @@ class BaseEkaClient(ABC):
         endpoint: str,
         api_base_url: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """Make authenticated request to Eka.care API."""
         # Get current settings and initialize url for exception handling
         api_base = api_base_url or settings.api_base_url
         url = f"{api_base}{endpoint}"
-        headers = {}
+        headers = headers or {}
         
         try:
             if not settings.client_id:

@@ -88,12 +88,11 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
         tags={"patient", "read", "basic", "profile"},
         annotations=readonly_tool_annotations()
     )
     async def get_patient_details_basic(
-        patient_id: Annotated[str, "Patient's unique identifier"],
+        patient_id: Annotated[Optional[str], "Patient's unique identifier"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -331,8 +330,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
         annotations=write_tool_annotations()
     )
     async def update_patient(
-        patient_id: Annotated[str, "Unique identifier of the patient to update"],
         update_data: Annotated[Dict[str, Any], "Dictionary of fields and values to update (e.g., name, mobile, dob)"],
+        patient_id: Annotated[Optional[str], "Unique identifier of the patient to update"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -574,7 +573,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         annotations=readonly_tool_annotations()
     )
     async def get_patient_vitals(
-        patient_id: Annotated[str, "Patient's unique identifier (oid)"],
+        patient_id: Annotated[Optional[str], "Patient's unique identifier (oid)"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
