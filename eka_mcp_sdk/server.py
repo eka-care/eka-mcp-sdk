@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 import logging
+import sys
 from fastmcp import FastMCP
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
@@ -9,7 +10,16 @@ from fastmcp.server.context import Context
 from eka_mcp_sdk.config.settings import settings
 from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
 
+# Configure logging to stderr (which MCP captures)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr
+)
 logger = logging.getLogger(__name__)
+
+# Enable SDK client logging
+logging.getLogger("eka_mcp_sdk.clients").setLevel(logging.DEBUG)
 
 
 def create_mcp_server() -> FastMCP:

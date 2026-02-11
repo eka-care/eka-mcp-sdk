@@ -58,10 +58,10 @@ class BaseEkaClient(ABC):
             self.last_curl_command = curl_cmd  # Store for test access
             
             # Use standard Python logging
-            logger.debug(f"API Request: {method} {endpoint}")
+            logger.info(f"API Request: {method} {endpoint}")
             if params:
-                logger.debug(f"Request params: {params}")
-            logger.debug(f"Curl command: {curl_cmd}")
+                logger.info(f"Request params: {params}")
+            logger.info(f"Curl command: {curl_cmd}")
             
             # Make request
             response = await self._http_client.request(
