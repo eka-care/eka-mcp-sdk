@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_access_token, AccessToken
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
-from ..utils.fastmcp_helper import readonly_tool_annotations, elicitation_response
+from ..utils.fastmcp_helper import readonly_tool_annotations
 
 from ..utils.enrichment_helpers import get_cached_data, extract_patient_summary, extract_doctor_summary
 
@@ -496,7 +496,6 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         tags={"doctor", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )
-    @elicitation_response
     async def doctor_availability_elicitation(
         doctor_id: Annotated[str, "Doctor ID (mandatory)"],
         hospital_id: Annotated[Optional[str], "Hospital/Clinic ID (optional, if known)"] = None,
@@ -505,7 +504,13 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Elicit doctor availability for appointment booking.
+        Check doctor availability for appointment booking.
+        
+        Behavior:
+        - If preferred_date AND preferred_slot_time are provided: checks if that specific slot 
+          is available and returns a direct response (non-elicitation).
+        - If date/time are NOT provided: returns elicitation response with available options 
+          for the user to choose from.
         
         Flow:
         1. Fetch doctor details
@@ -518,7 +523,8 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         available times for doctor
         
         Returns:
-            UI component format (doctor_card) with availability and callbacks
+            - If date+time provided: Direct availability check result
+            - If date+time missing: UI component format (doctor_card) with availability and callbacks for elicitation
         """
         await ctx.info(f"[doctor_availability_elicitation] doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}")
         
@@ -540,11 +546,24 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             )
             
             await ctx.info(f"[doctor_availability_elicitation] Completed\n")
+            
+            # Client returns slot_confirmed=True only when preferred date+time are available
+            # is_elicitation is False only when the specific slot is confirmed
+            result["is_elicitation"] = not result.get("slot_confirmed", False)
+            
             return result
             
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation] Failed: {e.message}\n")
-            return {"error": e.message}
+            # Errors should NOT be elicitation responses
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
 
     @mcp.tool(
         tags={"doctor", "search", "discovery"},
