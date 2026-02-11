@@ -322,9 +322,12 @@ class EkaEMRClient(BaseEMRClient):
         3. Resolve clinic_id (validate or use first available)
         4. Fetch available dates and slots
         5. Build UI response with callbacks
+        6. Determine if this is a confirmed slot or needs elicitation
         
         Returns:
-            UI contract with doctor_card component, availability, and callbacks
+            UI contract with doctor_card component, availability, callbacks, and:
+            - slot_confirmed: True if preferred_date + preferred_slot_time are available
+            - slot_confirmed: False if elicitation is needed (user must select)
         """
         # 1. Fetch doctor profile
         doctor_profile = await self.get_doctor_profile(doctor_id)
@@ -351,6 +354,7 @@ class EkaEMRClient(BaseEMRClient):
             doctor_entry["slot_preference"] = preferred_slot_time
         
         # 5. Fetch availability if clinic is resolved
+        slot_confirmed = False
         if resolved_clinic_id:
             availability_list, selected_date = await self._fetch_doctor_availability(
                 doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
@@ -359,11 +363,54 @@ class EkaEMRClient(BaseEMRClient):
                 doctor_entry["availability"] = availability_list
             if selected_date:
                 doctor_entry["selected_date"] = selected_date
+            
+            # 6. Check if the specific preferred slot is available
+            if preferred_date and preferred_slot_time:
+                slot_confirmed = self._is_slot_available(
+                    availability_list, preferred_date, preferred_slot_time
+                )
         
-        # 6. Build and return response
+        # 7. If slot is confirmed, return a simple confirmation response
+        if slot_confirmed:
+            return {
+                "slot_confirmed": True,
+                "doctor_id": doctor_id,
+                "hospital_id": resolved_clinic_id,
+                "date": preferred_date,
+                "time": preferred_slot_time,
+                "message": f"Slot available at {preferred_slot_time} on {preferred_date}",
+                "doctor_name": doctor_profile.get("name", ""),
+            }
+        
+        # 8. Otherwise, build full elicitation response for user to select
         doctor_details = build_doctor_details_for_card(doctor_profile, doctor_clinics)
-        return build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+        response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+        response["slot_confirmed"] = False
+        return response
     
+    def _is_slot_available(
+        self,
+        availability_list: List[Dict[str, Any]],
+        preferred_date: str,
+        preferred_slot_time: str
+    ) -> bool:
+        """
+        Check if the requested date and time slot is available.
+        
+        Args:
+            availability_list: List of availability entries with date and slots
+            preferred_date: The requested date in YYYY-MM-DD format
+            preferred_slot_time: The requested time slot in HH:MM format
+        
+        Returns:
+            True if the specific slot is available, False otherwise
+        """
+        for day_availability in availability_list:
+            if day_availability.get("date") == preferred_date:
+                slots = day_availability.get("slots", [])
+                return preferred_slot_time in slots
+        return False
+
     async def _fetch_doctor_availability(
         self,
         doctor_id: str,
