@@ -555,14 +555,10 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation] Failed: {e.message}\n")
-            # Errors should NOT be elicitation responses
             return {
-                "success": False,
-                "error": {
-                    "message": e.message,
-                    "status_code": e.status_code,
-                    "error_code": e.error_code
-                }
+                "error": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
             }
 
     @mcp.tool(
