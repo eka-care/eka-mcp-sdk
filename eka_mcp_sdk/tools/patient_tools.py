@@ -200,7 +200,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
 )
     async def add_patient(
         patient_data: PatientData,
-        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -245,7 +244,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.add_patient(patient_dict, auth_token)  
+            result = await patient_service.add_patient(patient_dict)  
             
             patient_id = result.get('oid') if isinstance(result, dict) else None
             await ctx.info(f"[add_patient] Completed successfully - patient ID: {patient_id}\n")
@@ -422,7 +421,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
     async def get_patient_by_mobile(
         mobile: Annotated[str, "Mobile with country code: +919876543210"],
         full_profile: Annotated[bool, "Return full profile if True (default: False)"] = False,
-        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -454,7 +452,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.get_patient_by_mobile(mobile, full_profile, auth_token)
+            result = await patient_service.get_patient_by_mobile(mobile, full_profile)
             return {"success": True, "data": result}
         except EkaAPIError as e:
             return {

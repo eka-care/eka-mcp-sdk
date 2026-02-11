@@ -175,7 +175,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
         start_date: Annotated[Optional[str], "Start date YYYY-MM-DD (default: tomorrow). Must be today or future."] = None,
         max_days: Annotated[int, "Maximum number of dates to return (default: 7, max: 10)"] = 7,
-        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -241,7 +240,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             
             # Fetch available dates - client returns common format
             result = await appointment_service.get_available_dates(
-                doctor_id, clinic_id, start_datetime, end_datetime, auth_token
+                doctor_id, clinic_id, start_datetime, end_datetime
             )
             
             # Limit to max_days
@@ -271,7 +270,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
         clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
         date: Annotated[str, "Date to check slots for (YYYY-MM-DD format)"],
-        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -314,7 +312,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             
             # Fetch slots - client returns common contract format
             response_data = await appointment_service.get_available_slots(
-                doctor_id, clinic_id, date, auth_token
+                doctor_id, clinic_id, date
             )
             
             await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
@@ -333,7 +331,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     )
     async def book_appointment(
         booking: AppointmentBookingRequest,
-        auth_token: Annotated[Optional[str], "auth token may be required for client specific hospitals related services"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -397,7 +394,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 end_time=booking.end_time,
                 mode=booking.mode,
                 reason=booking.reason,
-                auth_token=auth_token
             )
             
             if result.get("success"):

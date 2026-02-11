@@ -113,13 +113,12 @@ class PatientService:
         
         return comprehensive_profile
     
-    async def add_patient(self, patient_data: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
+    async def add_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new patient profile.
         
         Args:
             patient_data: Patient information including required and optional fields
-            auth_token: Optional authentication token (for clients that require it)
             
         Returns:
             Created patient profile with oid identifier
@@ -127,7 +126,7 @@ class PatientService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.add_patient(patient_data, auth_token)
+        return await self.client.add_patient(patient_data)
     
     async def list_patients(
         self,
@@ -201,7 +200,6 @@ class PatientService:
         self,
         mobile: str,
         full_profile: bool = False,
-        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Retrieve patient profiles by mobile number.
@@ -209,7 +207,6 @@ class PatientService:
         Args:
             mobile: Mobile number in format +<country_code><number>
             full_profile: If True, returns full patient profile details
-            auth_token: Optional authentication token (for clients that require it)
             
         Returns:
             Patient profile(s) matching the mobile number
@@ -217,7 +214,7 @@ class PatientService:
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_patient_by_mobile(mobile, full_profile, auth_token)
+        return await self.client.get_patient_by_mobile(mobile, full_profile)
     
     async def mobile_number_verification(
         self,
