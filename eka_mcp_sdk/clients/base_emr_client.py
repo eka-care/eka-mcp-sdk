@@ -35,7 +35,7 @@ class BaseEMRClient(BaseEkaClient):
         pass
     
     @abstractmethod
-    async def add_patient(self, patient_data: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
+    async def add_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a patient profile."""
         pass
     
@@ -66,7 +66,7 @@ class BaseEMRClient(BaseEkaClient):
         pass
     
     @abstractmethod
-    async def get_patient_by_mobile(self, mobile: str, full_profile: bool = False, auth_token: Optional[str] = None) -> Dict[str, Any]:
+    async def get_patient_by_mobile(self, mobile: str, full_profile: bool = False) -> Dict[str, Any]:
         """Retrieve patient profiles by mobile number."""
         pass
     
@@ -83,7 +83,7 @@ class BaseEMRClient(BaseEkaClient):
         pass
     
     @abstractmethod
-    async def get_doctor_profile(self, doctor_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
+    async def get_doctor_profile(self, doctor_id: str) -> Dict[str, Any]:
         """Get Doctor profile."""
         pass
     
@@ -94,7 +94,7 @@ class BaseEMRClient(BaseEkaClient):
 
     @abstractmethod
     async def doctor_discovery(
-        self, auth_token: Optional[str] = None, doctor_name=None, specialty=None, city=None, gender=None
+        self, doctor_name=None, specialty=None, city=None, gender=None
     ) -> List[Dict[str, Any]]:
         """
         Search for doctors using the local Tantivy index.
@@ -113,15 +113,14 @@ class BaseEMRClient(BaseEkaClient):
     async def get_available_slots(self,
         doctor_id: str,
         clinic_id: str,
-        date: str,
-        auth_token: Optional[str] = None
+        date: str
     ) -> Dict[str, Any]:
         """Get Appointment Slots for a specific date in common contract format."""
         pass
 
     @abstractmethod
     async def get_available_dates(
-        self, doctor_id: str, clinic_id: str, start_date: str, end_date: str, auth_token: Optional[str] = None
+        self, doctor_id: str, clinic_id: str, start_date: str, end_date: str
     ) -> Dict[str, Any]:
         """Get available appointment dates in common contract format."""
         pass
@@ -156,8 +155,7 @@ class BaseEMRClient(BaseEkaClient):
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None,
-        auth_token: Optional[str] = None
+        reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
