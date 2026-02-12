@@ -434,9 +434,9 @@ class EkaEMRClient(BaseEMRClient):
                 pref_date = datetime.strptime(preferred_date, "%Y-%m-%d").date()
                 start_date = max(today, pref_date - timedelta(days=2))
             except ValueError:
-                start_date = today + timedelta(days=1)
+                start_date = today
         else:
-            start_date = today + timedelta(days=1)
+            start_date = today
         
         try:
             # Fetch available dates for the range
