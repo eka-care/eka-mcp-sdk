@@ -427,6 +427,7 @@ class EkaEMRClient(BaseEMRClient):
             tuple: (availability_list, selected_date)
         """
         today = datetime.now().date()
+        today_str = today.strftime("%Y-%m-%d")
         
         # Calculate start date
         if preferred_date:
@@ -434,9 +435,9 @@ class EkaEMRClient(BaseEMRClient):
                 pref_date = datetime.strptime(preferred_date, "%Y-%m-%d").date()
                 start_date = max(today, pref_date - timedelta(days=2))
             except ValueError:
-                start_date = today + timedelta(days=1)
+                start_date = today
         else:
-            start_date = today + timedelta(days=1)
+            start_date = today
         
         try:
             # Fetch available dates for the range
@@ -458,6 +459,10 @@ class EkaEMRClient(BaseEMRClient):
                 slots_result = await self.get_available_slots(doctor_id, clinic_id, date_str)
                 slots = slots_result.get('all_slots', [])
                 
+                # Filter slots for today to have at least 15 min buffer from current time
+                if date_str == today_str and slots:
+                    slots = self._filter_slots_with_buffer(slots, buffer_minutes=15)
+                
                 if slots:
                     day_availability: Dict[str, Any] = {"date": date_str, "slots": slots}
                     
@@ -478,6 +483,35 @@ class EkaEMRClient(BaseEMRClient):
         except Exception as e:
             logger.warning(f"Failed to fetch availability: {e}")
             return [], None
+    
+    def _filter_slots_with_buffer(self, slots: List[str], buffer_minutes: int = 15) -> List[str]:
+        """
+        Filter out slots that are within buffer_minutes from the current time.
+        
+        Args:
+            slots: List of time slots in HH:MM format
+            buffer_minutes: Minimum minutes from now for a slot to be valid (default: 15)
+        
+        Returns:
+            Filtered list of slots that are at least buffer_minutes away
+        """
+        now = datetime.now()
+        min_valid_time = now + timedelta(minutes=buffer_minutes)
+        
+        filtered_slots = []
+        for slot in slots:
+            try:
+                # Parse slot time (HH:MM format)
+                slot_time = datetime.strptime(slot, "%H:%M").replace(
+                    year=now.year, month=now.month, day=now.day
+                )
+                if slot_time >= min_valid_time:
+                    filtered_slots.append(slot)
+            except ValueError:
+                # If parsing fails, include the slot anyway
+                filtered_slots.append(slot)
+        
+        return filtered_slots
 
     # Appointment Management APIs
     async def book_appointment(
