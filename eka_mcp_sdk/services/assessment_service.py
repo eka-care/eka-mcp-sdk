@@ -51,3 +51,32 @@ class AssessmentService:
             wfids=wfids,
             status=status
         )
+    
+    async def init_assessment(
+        self,
+        user_info: Dict[str, Any],
+        workflow_id: str,
+        patient_uuid: str,
+        practitioner_uuid: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Initialize a new assessment.
+        
+        Args:
+            user_info: Dictionary containing user information (e.g., dob, gender)
+            workflow_id: Workflow ID for the assessment
+            patient_uuid: UUID of the patient
+            practitioner_uuid: UUID of the practitioner
+            context: Optional context for the assessment
+            
+        Returns:
+            Dictionary containing the initialized assessment data
+        """
+        return await self.client.init_assessment(
+            user_info=user_info,
+            workflow_id=workflow_id,
+            patient_uuid=patient_uuid,
+            practitioner_uuid=practitioner_uuid,
+            context=context
+        )

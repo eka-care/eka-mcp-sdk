@@ -849,6 +849,25 @@ class EkaEMRClient(BaseEMRClient):
             endpoint=f"/dr/v1/prescription/{prescription_id}"
         )
     
+    async def init_assessment(self, user_info, workflow_id, patient_uuid, practitioner_uuid, context = None):
+        """Initialize a new assessment conversation."""
+        params = {}
+        if user_info:
+            params["user_info"] = user_info
+        if context:
+            params["context"] = context
+        if workflow_id:
+            params["workflow_id"] = workflow_id
+        if patient_uuid:
+            params["patient_uuid"] = patient_uuid
+        if practitioner_uuid:
+            params["practitioner_uuid"] = practitioner_uuid
+        return await self._make_request(
+            method="POST",
+            endpoint="/assessment/api/v1/init/",
+            data=params
+        )
+    
     # Abstract method implementations (Not implemented for this client)
     async def doctor_discovery(self, *args, **kwargs) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
