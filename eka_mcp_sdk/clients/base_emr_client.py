@@ -211,6 +211,17 @@ class BaseEMRClient(BaseEkaClient):
         """Get Prescription details."""
         pass
     
+    # ==================== Assessment Operations ====================
+
+    @abstractmethod
+    async def fetch_grouped_assessments(self, **filters) -> Dict[str, Any]:
+        """Fetch grouped assessment conversations based on filters."""
+        pass
+
+    @abstractmethod
+    async def init_assessment(self, user_info: Dict[str, Any], workflow_id: str, patient_uuid: str, practitioner_uuid: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Initialize a new assessment."""
+        pass
 
     # ==================== Lifecycle ====================
     
