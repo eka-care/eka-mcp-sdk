@@ -280,6 +280,15 @@ cat examples/MCP_USAGE.md
 | `EKA_MCP_SERVER_PORT` | MCP server port | `8000` |
 | `EKA_LOG_LEVEL` | Logging level | `INFO` |
 
+## Troubleshooting
+
+**Git tag versioning (hatch-vcs)**
+- Tags must follow PEP 440: `v0.2.0a1`, `v0.2.0rc1`, `v0.2.0.dev1` — not `v0.1.0-test`
+- If an invalid tag exists alongside a valid one on the same commit, `setuptools_scm` may pick the invalid one → delete the bad tag: `git push origin --delete <bad-tag>`
+- After fixing tags, clear uv's build cache: `uv cache clean`
+
+---
+
 ## Support
 
 - **Documentation**: [developer.eka.care](https://developer.eka.care)
