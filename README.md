@@ -1,6 +1,6 @@
 # Eka.care MCP SDK
 
-A simple, self-hosted Model Context Protocol (MCP) server that exposes Eka.care's healthcare APIs to LLM applications like Claude Desktop. This enables seamless integration of healthcare data and services into AI-powered workflows.
+A Python library and self-hosted MCP server that exposes Eka.care's healthcare APIs to LLM applications. Use it as an importable library in your own projects, or run it directly as a standalone MCP server.
 
 ## 📚 Documentation
 
@@ -12,12 +12,13 @@ A simple, self-hosted Model Context Protocol (MCP) server that exposes Eka.care'
 
 ## Features
 
-- **Self-Hosted Deployment**: Clean, simple deployment for healthcare organizations
-- **Modular Architecture**: Easy to extend with additional API modules  
+- **Importable Library**: Use services and clients directly in your Python applications
+- **Self-Hosted MCP Server**: Run as stdio or HTTP for Claude Desktop and other MCP clients
+- **Modular Architecture**: Easy to extend with additional API modules
 - **Simple Authentication**: Client ID/Secret + optional API key authentication
 - **Comprehensive Error Handling**: Direct forwarding of Eka.care API errors for transparency
 - **LLM-Optimized Responses**: Structured data formats optimized for LLM consumption
-- **Reusable Core**: Core components can be imported for building hosted MCP solutions
+- **Multi-Tenant Workspace Routing**: Route requests to different client implementations
 
 ## Supported API Modules
 
@@ -33,22 +34,31 @@ You can easily add more API modules like:
 - **Self Assessment**: Health surveys, symptom checking, record analysis
 - **Custom Modules**: Build your own using the base client architecture
 
-## Quick Start
+## Installation
 
-### Installation
+### As a library (in your project)
 
 ```bash
-# Clone the repository
-git clone git@github.com:eka-care/eka-mcp-sdk.git
+# Latest from main
+pip install git+https://github.com/eka-care/eka-mcp-sdk.git@main
+
+# Or pin to a specific release tag
+pip install git+https://github.com/eka-care/eka-mcp-sdk.git@v0.1.0
+```
+
+With `uv`:
+```bash
+uv add "eka-mcp-sdk @ git+https://github.com/eka-care/eka-mcp-sdk.git@main"
+```
+
+### For local development / self-hosted server
+
+```bash
+git clone https://github.com/eka-care/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with UV (recommended)
 uv sync
-
-# Activate the virtual environment
-source .venv/bin/activate  # On macOS/Linux
-# or
-.venv\Scripts\activate     # On Windows
 
 # Or with pip
 pip install -e .
@@ -73,14 +83,34 @@ EKA_MCP_SERVER_PORT=8000
 EKA_LOG_LEVEL=INFO
 ```
 
-### Running the Server
+### Using as a Python Library
+
+```python
+from eka_mcp_sdk.services import PatientService, AppointmentService
+from eka_mcp_sdk.clients.eka_emr_client import EkaEMRClient
+
+client = EkaEMRClient()
+patient_service = PatientService(client)
+result = await patient_service.search_patients("john")
+```
+
+For sync contexts (e.g. CrewAI):
+```python
+from eka_mcp_sdk.lib import search_patients_sync, get_appointments_enriched_sync
+
+patients = search_patients_sync("john", limit=10)
+```
+
+### Running as MCP Server
 
 ```bash
-# Make sure virtual environment is activated
 source .venv/bin/activate  # On macOS/Linux
 
-# Run the MCP server
+# stdio (for Claude Desktop)
 eka-mcp-server
+
+# HTTP mode
+eka-mcp-server --transport http --host 0.0.0.0 --port 8000
 
 # Or alternatively
 python -m eka_mcp_sdk.server
@@ -205,11 +235,8 @@ EKA_WORKSPACE_CLIENT_TYPE=ekaemr
 
 ## Development
 
-### Setup Development Environment
-
 ```bash
-# Clone the repository
-git clone https://github.com/ekacare/eka-mcp-sdk.git
+git clone https://github.com/eka-care/eka-mcp-sdk.git
 cd eka-mcp-sdk
 
 # Install with development dependencies
@@ -233,66 +260,11 @@ uv run mypy .
 3. Register tools in `server.py`
 4. Update documentation
 
-## Development
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone git@github.com:eka-care/eka-mcp-sdk.git
-cd eka-mcp-sdk
-
-# Install development dependencies with UV
-uv sync --dev
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Run tests (if available)
-pytest
-
-# Run examples
-python examples/direct_usage.py
-python examples/crewai_usage.py  # Requires: pip install crewai
-```
-
-### Virtual Environment Management
-
-The project uses `uv` for dependency management. Key commands:
-
-```bash
-# Create/update virtual environment and install dependencies
-uv sync
-
-# Add a new dependency
-uv add package_name
-
-# Add a development dependency  
-uv add --dev package_name
-
-# Activate the virtual environment
-source .venv/bin/activate  # macOS/Linux
-.venv\Scripts\activate     # Windows
-
-# Deactivate
-deactivate
-```
-
 ### Running Examples
 
-Make sure the virtual environment is activated before running examples:
-
 ```bash
-source .venv/bin/activate
-
-# Direct API usage
 python examples/direct_usage.py
-
-# CrewAI integration (requires crewai package)
-uv add crewai  # Install CrewAI
-python examples/crewai_usage.py
-
-# MCP server documentation
+python examples/crewai_usage.py  # Requires: uv add crewai
 cat examples/MCP_USAGE.md
 ```
 
@@ -303,16 +275,25 @@ cat examples/MCP_USAGE.md
 | `EKA_API_BASE_URL` | Eka.care API base URL | `https://api.eka.care` |
 | `EKA_CLIENT_ID` | Client ID from Eka.care | Required |
 | `EKA_CLIENT_SECRET` | Client secret from Eka.care | Required |
-| `EKA_API_KEY` | API key for additional auth | Required|
+| `EKA_API_KEY` | API key for additional auth | Optional |
 | `EKA_MCP_SERVER_HOST` | MCP server host | `localhost` |
 | `EKA_MCP_SERVER_PORT` | MCP server port | `8000` |
 | `EKA_LOG_LEVEL` | Logging level | `INFO` |
+
+## Troubleshooting
+
+**Git tag versioning (hatch-vcs)**
+- Tags must follow PEP 440: `v0.2.0a1`, `v0.2.0rc1`, `v0.2.0.dev1` — not `v0.1.0-test`
+- If an invalid tag exists alongside a valid one on the same commit, `setuptools_scm` may pick the invalid one → delete the bad tag: `git push origin --delete <bad-tag>`
+- After fixing tags, clear uv's build cache: `uv cache clean`
+
+---
 
 ## Support
 
 - **Documentation**: [developer.eka.care](https://developer.eka.care)
 - **Email**: ekaconnect@eka.care
-- **Issues**: [GitHub Issues](https://github.com/ekacare/eka-mcp-sdk/issues)
+- **Issues**: [GitHub Issues](https://github.com/eka-care/eka-mcp-sdk/issues)
 
 ## License
 

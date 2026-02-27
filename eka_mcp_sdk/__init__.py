@@ -36,7 +36,12 @@ For building remote MCP servers, import from their respective modules:
     from eka_mcp_sdk.config.settings import EkaSettings, settings
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import version, PackageNotFoundError
+try:
+    __version__ = version("eka-mcp-sdk")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"
+
 __author__ = "Eka.care Team"
 __email__ = "ekaconnect@eka.care"
 

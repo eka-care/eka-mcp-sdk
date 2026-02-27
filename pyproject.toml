@@ -1,6 +1,6 @@
 [project]
 name = "eka-mcp-sdk"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MCP Server for Eka.care APIs - Healthcare data integration for LLM applications"
 authors = [
     { name = "Eka.care Team", email = "ekaconnect@eka.care" }
@@ -44,17 +44,20 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ekacare/eka-mcp-sdk"
+Homepage = "https://github.com/eka-care/eka-mcp-sdk"
 Documentation = "https://developer.eka.care"
-Repository = "https://github.com/ekacare/eka-mcp-sdk"
-Issues = "https://github.com/ekacare/eka-mcp-sdk/issues"
+Repository = "https://github.com/eka-care/eka-mcp-sdk"
+Issues = "https://github.com/eka-care/eka-mcp-sdk/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.black]
 line-length = 88

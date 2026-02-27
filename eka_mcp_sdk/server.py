@@ -5,6 +5,8 @@ import logging
 from fastmcp import FastMCP
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from eka_mcp_sdk.config.settings import settings
 from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
@@ -46,6 +48,10 @@ def create_mcp_server() -> FastMCP:
             "status": "running"
         }
     
+    @mcp.custom_route("/health", methods=["GET"])
+    async def health_check(request: Request) -> PlainTextResponse:
+        return PlainTextResponse("OK")
+
     # Register all tool modules
     register_doctor_tools(mcp)
 
