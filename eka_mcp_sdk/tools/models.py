@@ -93,16 +93,3 @@ class AppointmentBookingRequest(BaseModel):
                 raise ValueError(f"End time ({v}) must be after start time ({start})")
         return v
     
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "patient_id": "176650465340471",
-                "doctor_id": "do1765290197897",
-                "clinic_id": "c-b4c014c9c2aa415c88c9aaa7",
-                "date": "2025-12-30",
-                "start_time": "15:00",
-                "end_time": "15:30",
-                "mode": "INCLINIC",
-                "reason": "Regular checkup"
-            }
-        }

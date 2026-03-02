@@ -419,7 +419,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         annotations=readonly_tool_annotations()
     )
     async def get_patient_by_mobile(
-        mobile: Annotated[str, "Mobile with country code: +919876543210"],
+        mobile: Annotated[str, "Mobile with country code: +91XXXXXXXXX"],
         full_profile: Annotated[bool, "Return full profile if True (default: False)"] = False,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
@@ -430,8 +430,8 @@ def register_patient_tools(mcp: FastMCP) -> None:
         DO NOT call this tool if you don't have the mobile number.
         
         Format: +<country_code><number>
-        - India: +919876543210
-        - US: +11234567890
+        - India: +91XXXXXXXXX
+        - US: +1XXXXXXXXXX
         
         When to use:
         - User provides their mobile number
@@ -482,7 +482,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         - Stage 2 (verify_otp): Verify the OTP received by the patient
         
         Args:
-            mobile_number: 10-digit mobile number without country code (e.g., "9876543210")
+            mobile_number: 10-digit mobile number without country code (e.g., "98XXXXXXXX")
             otp: OTP code received on mobile (required only for verify_otp stage)
             stage: "send_otp" to send OTP, "verify_otp" to verify received OTP
         

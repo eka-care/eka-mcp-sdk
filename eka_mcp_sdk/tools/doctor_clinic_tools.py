@@ -536,9 +536,10 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
+            doctor_clinic_service = DoctorClinicService(client)
             
             # Delegate to client - all orchestration logic is in the client layer
-            result = await client.doctor_availability_elicitation(
+            result = await doctor_clinic_service.doctor_availability_elicitation(
                 doctor_id=doctor_id,
                 clinic_id=hospital_id,
                 preferred_date=preferred_date,
