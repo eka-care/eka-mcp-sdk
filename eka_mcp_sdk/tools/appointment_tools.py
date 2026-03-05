@@ -890,7 +890,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
