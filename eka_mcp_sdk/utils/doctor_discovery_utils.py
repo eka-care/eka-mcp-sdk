@@ -152,7 +152,7 @@ def build_doctor_details_for_card(
         "specialty": "Acupuncture",
         "specialties": ["Acupuncture"],
         "profile_pic": "...",
-        "languages": [],
+        "languages": "Hindi, English"..,
         "clinics": [{"clinic_id": "...", "name": "...", "address": {...}}]
     }
     
@@ -173,9 +173,12 @@ def build_doctor_details_for_card(
             "region_id": c.get('region_id', '')
         })
     
+    specialties = doctor_profile.get('specialties', [])
+    specialty = ", ".join(specialties) if specialties else doctor_profile.get('specialty', '')
+
     details: Dict[str, Any] = {
         "name": doctor_profile.get('name', ''),
-        "specialty": doctor_profile.get('specialty', ''),
+        "specialty": specialty,
         "hospitals": hospitals
     }
     
@@ -184,7 +187,8 @@ def build_doctor_details_for_card(
         details["profile_pic"] = doctor_profile['profile_pic']
     
     if doctor_profile.get('languages'):
-        details["languages"] = doctor_profile['languages']
+        langs = doctor_profile['languages']
+        details["languages"] = ", ".join(langs) if isinstance(langs, list) else langs
     
     if doctor_profile.get('experience'):
         details["experience"] = str(doctor_profile['experience'])
