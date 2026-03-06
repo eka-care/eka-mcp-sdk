@@ -174,7 +174,9 @@ def build_doctor_details_for_card(
         })
     
     specialties = doctor_profile.get('specialties', [])
-    specialty = ", ".join(specialties) if specialties else doctor_profile.get('specialty', '')
+    specialty = ", ".join(
+        s.get('name', '') if isinstance(s, dict) else s for s in specialties
+    ) if specialties else doctor_profile.get('specialty', '')
 
     details: Dict[str, Any] = {
         "name": doctor_profile.get('name', ''),
@@ -188,7 +190,10 @@ def build_doctor_details_for_card(
     
     if doctor_profile.get('languages'):
         langs = doctor_profile['languages']
-        details["languages"] = ", ".join(langs) if isinstance(langs, list) else langs
+        details["languages"] = ", ".join(
+            lang.get('name', '') if isinstance(lang, dict) else lang
+            for lang in langs
+        ) if isinstance(langs, list) else langs
     
     if doctor_profile.get('experience'):
         details["experience"] = str(doctor_profile['experience'])
