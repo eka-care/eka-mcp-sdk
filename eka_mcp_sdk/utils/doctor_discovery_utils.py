@@ -191,7 +191,7 @@ def build_doctor_details_for_card(
     if doctor_profile.get('languages'):
         langs = doctor_profile['languages']
         details["languages"] = ", ".join(
-            lang.get('name', '') if isinstance(lang, dict) else lang
+            lang.get('value', lang.get('name', '')) if isinstance(lang, dict) else lang
             for lang in langs
         ) if isinstance(langs, list) else langs
     
