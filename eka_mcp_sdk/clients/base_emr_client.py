@@ -33,6 +33,16 @@ class BaseEMRClient(BaseEkaClient):
         Unified mobile number verification - handles both OTP send and verify stages.
         """
         pass
+
+    async def authentication_elicitation(
+        self,
+        mobile_number: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Unified mobile number verification - handles both OTP send and verify stages.
+        """
+        pass
     
     @abstractmethod
     async def add_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:

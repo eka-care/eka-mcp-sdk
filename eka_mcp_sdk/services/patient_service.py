@@ -235,6 +235,20 @@ class PatientService:
         """
         return await self.client.mobile_number_verification(mobile_number, otp, stage)
     
+    async def authentication_elicitation(
+        self,
+        mobile_number: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Elicit authentication information for a patient.
+
+        Args:
+            mobile_number: Mobile number of the patient
+            meta: Additional metadata for authentication
+        """
+        return await self.client.authentication_elicitation(mobile_number, meta)
+
     async def list_all_patient_profiles(self) -> Dict[str, Any]:
         """
         Retrieve all patient profiles.

@@ -867,6 +867,10 @@ class EkaEMRClient(BaseEMRClient):
         """Not implemented for EkaEMRClient."""
         return {"error": "Not implemented", "message": "mobile_number_verification is not available for this workspace"}
     
+    def authentication_elicitation(self, *args, **kwargs) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "authentication_elicitation is not available for this workspace"}
+
     async def list_all_patient_profiles(self) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
         return {"error": "Not implemented", "message": "list_all_patient_profiles is not available for this workspace"}

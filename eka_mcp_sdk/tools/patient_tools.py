@@ -526,6 +526,45 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 }
             }
 
+
+    @mcp.tool(
+        tags={"patient", "auth", "authentication", "authorization"},
+        annotations=write_tool_annotations()
+    )
+    async def authentication_elicitation(
+        mobile_number: Annotated[Optional[str], "Mobile number to verify (10 digits without country code)"]=None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        This tool is used to elicit authentication from the user. It performs entire authentication flow required.
+
+        Use this tool for authenticating a user.
+        """
+        meta = ctx.request_context.meta
+        await ctx.info(f"[authentication_elicitation] Initiating authentication for: {mobile_number}")
+
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.authentication_elicitation(mobile_number, meta)
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[authentication_elicitation] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
     @mcp.tool(
         tags={"patient", "profile", "list"},
         annotations=readonly_tool_annotations()
