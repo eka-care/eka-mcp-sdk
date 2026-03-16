@@ -552,8 +552,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            result = await patient_service.authentication_elicitation(mobile_number, meta)
-            return {"success": True, "data": result}
+            return await patient_service.authentication_elicitation(mobile_number, meta)
         except EkaAPIError as e:
             await ctx.error(f"[authentication_elicitation] Failed: {e.message}\n")
             return {
