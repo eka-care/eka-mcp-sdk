@@ -728,15 +728,16 @@ class EkaEMRClient(BaseEMRClient):
     
     async def reschedule_appointment(
         self,
-        appointment_id: str,
-        reschedule_data: Dict[str, Any]
+        reschedule_data_json: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Reschedule Appointment."""
-        return await self._make_request(
-            method="PUT",
-            endpoint=f"/dr/v1/appointment/{appointment_id}/reschedule",
-            data=reschedule_data
-        )
+        # return await self._make_request(
+        #     method="PUT",
+        #     endpoint=f"/dr/v1/appointment/{appointment_id}/reschedule",
+        #     data=reschedule_data
+        # )
+        return {"error": "Not implemented", "message": "reschedule_appointment is not available for this workspace"}
+
     
     async def park_appointment(
         self,

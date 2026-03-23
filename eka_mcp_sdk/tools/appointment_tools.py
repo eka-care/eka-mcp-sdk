@@ -1,3 +1,4 @@
+from eka_mcp_sdk.tools.models import RescheduleAppointmentRequest
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
 from datetime import datetime, timedelta
@@ -941,13 +942,12 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
+        enabled=True,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
     )
     async def reschedule_appointment(
-        appointment_id: Annotated[str, "Appointment ID"],
-        reschedule_data: Annotated[Dict[str, Any], "New date and time"],
+        reschedule_data: RescheduleAppointmentRequest,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -967,7 +967,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             If rescheduling fails, returns an error response. This action should not be retried automatically without user confirmation.
 
         """
-        await ctx.info(f"[reschedule_appointment] Rescheduling appointment: {appointment_id}")
+        await ctx.info(f"[reschedule_appointment] Rescheduling appointment: {RescheduleAppointmentRequest}")
         
         try:
             token: AccessToken | None = get_access_token()
@@ -977,10 +977,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
-            appointment_service = AppointmentService(client)
-            result = await appointment_service.reschedule_appointment(appointment_id, reschedule_data)
+            appointment_service  = AppointmentService(client)
+            reschedule_data_json = reschedule_data.model_dump(exclude_none=True)
+            result = await appointment_service.reschedule_appointment(reschedule_data_json)
             
-            await ctx.info(f"[reschedule_appointment] Completed successfully\n")
+            await ctx.info("[reschedule_appointment] Completed successfully\n")
             
             return {"success": True, "data": result}
         except EkaAPIError as e:

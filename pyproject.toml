@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dependencies = [
-    "fastmcp @ git+https://github.com/jlowin/fastmcp.git@main",
+    "fastmcp==2.14.5",
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",

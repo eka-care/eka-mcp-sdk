@@ -4,7 +4,7 @@ from fastmcp.settings import ENV_FILE
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Any, Optional
 
-DEFAULT_EKAEMR_TOOLS = ["search_patients","get_comprehensive_patient_profile","add_patient","list_patients","update_patient","archive_patient","get_patient_by_mobile","get_business_entities","get_doctor_profile_basic","get_clinic_details_basic","get_doctor_services","get_comprehensive_doctor_profile","get_comprehensive_clinic_profile","get_available_dates","get_appointment_slots","doctor_availability_elicitation","book_appointment","show_appointments_enriched","show_appointments_basic","get_appointment_details_enriched","get_appointment_details_basic","get_patient_appointments_enriched","get_patient_appointments_basic","update_appointment","complete_appointment","cancel_appointment","reschedule_appointment","get_prescription_details_basic","get_comprehensive_prescription_details"]
+DEFAULT_EKAEMR_TOOLS = ["search_patients","get_comprehensive_patient_profile","add_patient","list_patients","update_patient","archive_patient","get_patient_by_mobile","get_business_entities","get_doctor_profile_basic","get_clinic_details_basic","get_doctor_services","get_comprehensive_doctor_profile","get_comprehensive_clinic_profile","get_available_dates","get_appointment_slots","doctor_availability_elicitation","book_appointment","show_appointments_enriched","show_appointments_basic","get_appointment_details_enriched","get_appointment_details_basic","get_patient_appointments_enriched","get_patient_appointments_basic","update_appointment","complete_appointment","cancel_appointment","get_prescription_details_basic","get_comprehensive_prescription_details"]
 
 
 class EkaSettings(BaseSettings):

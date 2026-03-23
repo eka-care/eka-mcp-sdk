@@ -2,7 +2,10 @@
 
 from datetime import datetime
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
+
+DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+TIME_24H_PATTERN = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
 
 class PatientData(BaseModel):
     fln: str = Field(
@@ -93,3 +96,26 @@ class AppointmentBookingRequest(BaseModel):
                 raise ValueError(f"End time ({v}) must be after start time ({start})")
         return v
     
+
+class RescheduleAppointmentRequest(BaseModel):
+    """Appointment reschedule request model"""
+    
+    appointment_id: str = Field(
+        ...,
+        description="Appointment's unique identifier (oid from appointment lookup)",
+    )
+    new_date: str = Field(
+        ...,
+        description="New date in YYYY-MM-DD format (today or future)",
+        pattern=DATE_PATTERN,
+    )
+    new_start_time: str = Field(
+        ...,
+        description="New start time in HH:MM 24-hour format (e.g., 15:00 for 3pm, 12:00 for noon)",
+        pattern=TIME_24H_PATTERN,
+    )
+    new_end_time: Optional[str] = Field(
+        None,
+        description="New end time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
+        pattern=TIME_24H_PATTERN,
+    )
