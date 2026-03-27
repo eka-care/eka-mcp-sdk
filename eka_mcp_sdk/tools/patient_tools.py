@@ -532,7 +532,9 @@ def register_patient_tools(mcp: FastMCP) -> None:
         annotations=write_tool_annotations()
     )
     async def authentication_elicitation(
+        method: Annotated[Literal["mobile", "email"], "Authentication method to use"] = "mobile",
         mobile_number: Annotated[Optional[str], "Mobile number to verify (10 digits without country code)"]=None,
+        email_address: Annotated[Optional[str], "Email address of the user."]=None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
@@ -541,7 +543,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Use this tool for authenticating a user.
         """
         meta = ctx.request_context.meta
-        await ctx.info(f"[authentication_elicitation] Initiating authentication for: {mobile_number}")
+        await ctx.info(f"[authentication_elicitation] Initiating {method} authentication for mobile: {mobile_number}, email: {email_address}")
 
         try:
             token: AccessToken | None = get_access_token()
@@ -552,7 +554,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            return await patient_service.authentication_elicitation(mobile_number, meta)
+            return await patient_service.authentication_elicitation(method, mobile_number, email_address, meta)
         except EkaAPIError as e:
             await ctx.error(f"[authentication_elicitation] Failed: {e.message}\n")
             return {
@@ -646,6 +648,45 @@ def register_patient_tools(mcp: FastMCP) -> None:
                     "status_code": e.status_code,
                     "error_code": e.error_code
                 }
+            }
+
+    @mcp.tool(
+        tags={"patient", "benefits", "offers"}, annotations=readonly_tool_annotations()
+    )
+    async def get_patient_benefits(ctx: Context = CurrentContext()) -> Dict[str, Any]:
+        """
+        Retrieve available offers and benefits for a specific patient.
+
+        Use this tool to get information about the offers and benefits available to a specific patient.
+
+        Returns: list of offers and benefits specific to the patients.
+        """
+        await ctx.info("[get_patient_benefits] Fetching benefits for patient")
+
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            patient_service = PatientService(client)
+            result = await patient_service.get_patient_benefits()
+
+            await ctx.info(
+                "[get_patient_benefits] Retrieved patient benefits successfully\n"
+            )
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_patient_benefits] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code,
+                },
             }
 
 

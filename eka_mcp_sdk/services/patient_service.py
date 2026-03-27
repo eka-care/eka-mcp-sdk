@@ -234,20 +234,26 @@ class PatientService:
             Response indicating OTP sent/verification status
         """
         return await self.client.mobile_number_verification(mobile_number, otp, stage)
-    
+
     async def authentication_elicitation(
         self,
+        method: str,
         mobile_number: Optional[str] = None,
-        meta: Optional[Dict[Any, Any]] = None
+        email_address: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Elicit authentication information for a patient.
 
         Args:
+            method: Authentication method to use
             mobile_number: Mobile number of the patient
+            email_address: Email address of the patient
             meta: Additional metadata for authentication
         """
-        return await self.client.authentication_elicitation(mobile_number, meta)
+        return await self.client.authentication_elicitation(
+            method, mobile_number, email_address, meta
+        )
 
     async def list_all_patient_profiles(self) -> Dict[str, Any]:
         """
@@ -275,7 +281,16 @@ class PatientService:
             EkaAPIError: If the API call fails
         """
         return await self.client.get_patient_vitals(patient_id)
-    
+
+    async def get_patient_benefits(self) -> Dict[str, Any]:
+        """
+        Retrieve patient benefits.
+
+        Returns:
+            Patient benefits data
+        """
+        return await self.client.get_patient_benefits()
+
     async def _enrich_patient_appointments(
         self, 
         appointments_data: Dict[str, Any]

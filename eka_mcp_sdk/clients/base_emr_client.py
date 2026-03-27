@@ -36,7 +36,9 @@ class BaseEMRClient(BaseEkaClient):
 
     async def authentication_elicitation(
         self,
+        method: str,
         mobile_number: Optional[str] = None,
+        email_address: Optional[str] = None,
         meta: Optional[Dict[Any, Any]] = None
     ) -> Dict[str, Any]:
         """
