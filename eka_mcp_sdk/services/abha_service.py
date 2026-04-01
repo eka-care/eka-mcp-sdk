@@ -60,7 +60,7 @@ class AbhaService:
                 "abha_profiles": profiles_summary,
                 "next_action": {
                     "tool": "abha_select_profile",
-                    "instruction": "Show the user the list of ABHA profiles as a list with a show more option if the list is long - Name, ABHA Address, KYC Status. Then ask them to pick one. Call abha_select_profile with the chosen abha_address and the txn_id from this response.",
+                    "instruction": "Show the user the list of ABHA profiles (Name, ABHA Address, KYC Status) with a show more option if the list is long . Then ask them to pick one. Call abha_select_profile with the chosen abha_address and the txn_id from this response.",
                 },
             }
 
