@@ -387,10 +387,10 @@ class EkaEMRClient(BaseEMRClient):
         
         # 8. Build response based on client capability
         doctor_details = build_doctor_details_for_card(doctor_profile, doctor_clinics)
-        if supports_elicitation:
-            response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
-        else:
-            response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
+        # if supports_elicitation:
+        #     response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+        # else:
+        response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
         response["slot_confirmed"] = False
         return response
     
