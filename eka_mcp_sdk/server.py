@@ -10,6 +10,7 @@ from starlette.responses import PlainTextResponse
 
 from eka_mcp_sdk.config.settings import settings
 from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
+from eka_mcp_sdk.tools.abha_tools import register_abha_tools
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ def create_mcp_server() -> FastMCP:
 
     # Register all tool modules
     register_doctor_tools(mcp)
+    register_abha_tools(mcp)
 
     # Properly wrap _list_tools to add workspace filtering
     # We need to preserve the original method's signature and self binding
