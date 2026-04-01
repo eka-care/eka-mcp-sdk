@@ -313,7 +313,8 @@ class EkaEMRClient(BaseEMRClient):
         clinic_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
-        supports_elicitation: bool = True
+        supports_elicitation: bool = True,
+        meta: Optional[Dict[Any, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.
