@@ -391,7 +391,7 @@ class EkaEMRClient(BaseEMRClient):
         #     response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
         # else:
         response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
-        response["slot_confirmed"] = False
+        response["slot_confirmed"] = True # HACK: TO bypass elicitation. To remove this later.
         return response
     
     def _is_slot_available(
