@@ -93,8 +93,7 @@ class DoctorClinicService:
         clinic_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
-        supports_elicitation: bool = True,
-        meta: Optional[Dict[Any, Any]] = None
+        supports_elicitation: bool = True
     ) -> Dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.
@@ -106,7 +105,7 @@ class DoctorClinicService:
             (or plain availability data if supports_elicitation is False)
         """
         return await self.client.doctor_availability_elicitation(
-            doctor_id, clinic_id, preferred_date, preferred_slot_time, supports_elicitation, meta
+            doctor_id, clinic_id, preferred_date, preferred_slot_time, supports_elicitation
         )
     
     async def doctor_discovery(
@@ -114,8 +113,7 @@ class DoctorClinicService:
         doctor_name: Optional[str] = None,
         specialty: Optional[str] = None,
         city: Optional[str] = None,
-        gender: Optional[str] = None,
-        meta: Optional[Dict[Any, Any]] = None,
+        gender: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Search for doctors by various criteria.

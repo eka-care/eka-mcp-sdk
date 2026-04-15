@@ -526,8 +526,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             - If date+time provided: Direct availability check result
             - If date+time missing: UI component format (doctor_card) with availability and callbacks for elicitation
         """
-        meta = ctx.request_context.meta
-        await ctx.info(f"[doctor_availability_elicitation] doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}, meta: {meta}")
+        await ctx.info(f"[doctor_availability_elicitation] doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}")
         
         try:
             token: AccessToken | None = get_access_token()
@@ -545,8 +544,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 clinic_id=hospital_id,
                 preferred_date=preferred_date,
                 preferred_slot_time=preferred_slot_time,
-                supports_elicitation=get_supports_elicitation(),
-                meta=meta
+                supports_elicitation=get_supports_elicitation()
             )
             
             await ctx.info(f"[doctor_availability_elicitation] Completed\n")
@@ -608,10 +606,9 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 gender=gender,
             )
             
-            # doctor_count = len(result) if isinstance(result, list) else 0
-            # await ctx.info(f"[doctor_discovery_tool] Found {doctor_count} doctors\n")
-            result["is_elicitation"] = True
-            return result
+            doctor_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[doctor_discovery_tool] Found {doctor_count} doctors\n")
+            return {"success": True, "data": result}
             
         except EkaAPIError as e:
             await ctx.error(f"[doctor_discovery_tool] Failed: {e.message}\n")
