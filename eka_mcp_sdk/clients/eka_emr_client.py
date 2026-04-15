@@ -28,6 +28,7 @@ from ..utils.eka_response_parsers import (
     parse_business_entities
 )
 from ..utils.doctor_discovery_utils import (
+    build_elicitation_response,
     find_doctor_clinics,
     resolve_hospital_id,
     build_doctor_details_for_card,
