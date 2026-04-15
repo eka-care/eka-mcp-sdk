@@ -106,7 +106,7 @@ class BaseEMRClient(BaseEkaClient):
 
     @abstractmethod
     async def doctor_discovery(
-        self, doctor_name=None, specialty=None, city=None, gender=None, meta: Optional[Dict[Any, Any]] = None
+        self, doctor_name=None, specialty=None, city=None, gender=None
     ) -> List[Dict[str, Any]]:
         """
         Search for doctors using the local Tantivy index.
@@ -144,8 +144,7 @@ class BaseEMRClient(BaseEkaClient):
         clinic_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
-        supports_elicitation: bool = True,
-        meta: Optional[Dict[Any, Any]] = None,
+        supports_elicitation: bool = True
     ) -> Dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.
