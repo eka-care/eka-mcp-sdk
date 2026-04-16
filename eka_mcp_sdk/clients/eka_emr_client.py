@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta, timezone
 import copy
@@ -43,7 +41,6 @@ from ..utils.book_appointment_utils import (
     validate_clinic_schedule,
     get_slot_end_time
 )
-from ..knowledge_bases.search_engine import DoctorSearchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -60,47 +57,9 @@ _MESSENGER_HASHCODE = os.getenv("EKA_MESSENGER_HASHCODE", "##jfhjd")
 class EkaEMRClient(BaseEMRClient):
     """Client for Doctor Tool Integration APIs based on official OpenAPI spec.
     Uses utils/eka_response_parsers.py for Eka-specific parsing logic."""
-
-    def __init__(self, access_token: Optional[str] = None, custom_headers: Optional[Dict[str, str]] = None):
-        jwt_payload_str = custom_headers.get("jwt-payload") or "{}"
-        jwt_payload = json.loads(jwt_payload_str)
-        self.workspace_id = jwt_payload.get("w-id", "ekaemr")
-        super().__init__(access_token, custom_headers)
     
     def get_api_module_name(self) -> str:
         return "Doctor Tools"
-    
-    @staticmethod
-    def _init_search_engine() -> Optional[DoctorSearchEngine]:
-        """Initialise the local Tantivy doctor search engine."""
-        try:
-            index_path = (
-                Path(__file__).parent.parent
-                / "knowledge_bases"
-                / "doctor_search_index"
-            )
-            engine = DoctorSearchEngine(str(index_path))
-            logger.info("Initialised DoctorSearchEngine at %s", index_path)
-            return engine
-        except Exception as e:
-            logger.error("Failed to initialise DoctorSearchEngine: %s", e)
-            return None
-    
-    def _ensure_search_engine(self) -> DoctorSearchEngine:
-        """Return the search engine or raise if unavailable."""
-        if not getattr(self, "_search_engine", None):
-            logger.info("Doctor search engine is not initialised, initializing it now")
-            self._search_engine = self.__class__._init_search_engine()
-        return self._search_engine
-
-    @staticmethod
-    def _normalize_doctor_result(result: Dict[str, Any]) -> Dict[str, Any]:
-        """Add compatibility keys (name, years_of_experience) to a search result."""
-        if "doctor_name" in result:
-            result["name"] = result["doctor_name"]
-        if "years_experience" in result:
-            result["years_of_experience"] = result["years_experience"]
-        return result
     
     # Patient Management APIs
     async def add_patient(
@@ -924,26 +883,9 @@ class EkaEMRClient(BaseEMRClient):
         )
     
     # Abstract method implementations (Not implemented for this client)
-    async def doctor_discovery(self,
-        doctor_name: Optional[str] = None,
-        specialty: Optional[str] = None,
-        city: Optional[str] = None,
-        gender: Optional[str] = None,
-        ) -> Dict[str, Any]:
+    async def doctor_discovery(self, *args, **kwargs) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
-        try:
-            engine = self._ensure_search_engine()
-            results = engine.search_doctors(
-                workspace_id=self.workspace_id,
-                doctor_name=doctor_name,
-                specialization=specialty,
-                city=city,
-                gender=gender,
-            )
-            return [self._normalize_doctor_result(r) for r in results]
-        except Exception as e:
-            logger.error("Failed to search doctors: %s", e)
-            return {"error": "Failed to search doctors", "message": str(e)}
+        return {"error": "Not implemented", "message": "doctor_discovery is not available for this workspace"}
     
     async def get_appointments(self, *args, **kwargs) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
