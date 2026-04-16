@@ -1,0 +1,1082 @@
+from eka_mcp_sdk.tools.models import RescheduleAppointmentRequest
+from typing import Any, Dict, Optional, List, Union, Annotated
+import logging
+from datetime import datetime, timedelta
+from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token, AccessToken
+from fastmcp.dependencies import CurrentContext
+from fastmcp.server.context import Context
+from ..utils.fastmcp_helper import readonly_tool_annotations, write_tool_annotations
+from ..utils.deduplicator import get_deduplicator
+
+from ..clients.eka_emr_client import EkaEMRClient
+from ..auth.models import EkaAPIError
+from ..services.appointment_service import AppointmentService
+from .models import AppointmentBookingRequest
+from ..utils.tool_registration import get_extra_headers
+from ..utils.workspace_utils import get_workspace_id
+from ..utils.enrichment_helpers import (
+    get_cached_data,
+    extract_patient_summary,
+    extract_doctor_summary,
+    extract_clinic_summary
+)
+from ..clients.client_factory import ClientFactory
+
+logger = logging.getLogger(__name__)
+
+
+def find_alternate_slots(
+    all_slots: List[Dict[str, Any]], 
+    requested_date: str, 
+    requested_time: str,
+    max_alternatives: int = 6
+) -> List[Dict[str, str]]:
+    """
+    Find up to 6 nearest available slots around the requested time.
+    Returns slots both before and after the requested time.
+    
+    Args:
+        all_slots: List of all slots from the schedule
+        requested_datec: Date in YYYY-MM-DD format
+        requested_time: Time in HH:MM format
+        max_alternatives: Maximum number of alternatives to return (default: 6)
+    
+    Returns:
+        List of alternate slot dictionaries with start_time, end_time, and date
+    """
+    # Parse requested datetime
+    requested_dt = datetime.strptime(f"{requested_date} {requested_time}", "%Y-%m-%d %H:%M")
+    
+    # Collect available slots with their time difference from requested time
+    available_with_distance = []
+    
+    for slot in all_slots:
+        if not slot.get('available', False):
+            continue
+        
+        slot_start = slot.get('s', '')
+        slot_end = slot.get('e', '')
+        
+        if not slot_start or not slot_end:
+            continue
+        
+        try:
+            # Parse slot start time (handle timezone)
+            # Format: "2026-01-13T14:15:00+05:30"
+            slot_start_clean = slot_start.split('+')[0] if '+' in slot_start else slot_start.split('-')[0] if '-' in slot_start and slot_start.count('-') > 2 else slot_start
+            slot_end_clean = slot_end.split('+')[0] if '+' in slot_end else slot_end.split('-')[0] if '-' in slot_end and slot_end.count('-') > 2 else slot_end
+            
+            slot_dt = datetime.strptime(slot_start_clean, "%Y-%m-%dT%H:%M:%S")
+            
+            # Calculate time difference in minutes
+            time_diff = abs((slot_dt - requested_dt).total_seconds() / 60)
+            
+            available_with_distance.append({
+                'start_time': slot_dt.strftime("%H:%M"),
+                'end_time': datetime.strptime(slot_end_clean, "%Y-%m-%dT%H:%M:%S").strftime("%H:%M"),
+                'date': slot_dt.strftime("%Y-%m-%d"),
+                'datetime': slot_dt,
+                'distance': time_diff,
+                'is_before': slot_dt < requested_dt
+            })
+        except Exception:
+            # Skip slots with parsing errors
+            continue
+    
+    # Sort by distance from requested time
+    available_with_distance.sort(key=lambda x: x['distance'])
+    
+    # Take the nearest slots up to max_alternatives
+    nearest_slots = available_with_distance[:max_alternatives]
+    
+    # Format for response (remove helper fields)
+    formatted_slots = [
+        {
+            'date': slot['date'],
+            'start_time': slot['start_time'],
+            'end_time': slot['end_time'],
+            'time_difference_minutes': int(slot['distance'])
+        }
+        for slot in nearest_slots
+    ]
+    
+    return formatted_slots
+
+
+def register_appointment_tools(mcp: FastMCP) -> None:
+    """Register Enhanced Appointment Management MCP tools."""
+    
+    @mcp.tool(
+        tags={"appointment", "read", "slots", "availability"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_appointment_slots(
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        start_date: Annotated[str, "Start of FIRST day in ISO format: YYYY-MM-DDT00:00:00.000Z"],
+        end_date: Annotated[str, "End of LAST day in ISO format: YYYY-MM-DDT23:59:59.000Z"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve available appointment slots for a doctor. Supports multi-day ranges in a SINGLE call.
+
+        CRITICAL: Call this tool ONCE for date ranges, NOT multiple times for each day.
+        
+        ISO 8601 format examples:
+        - Single day (Jan 27): start=2026-01-27T00:00:00.000Z, end=2026-01-27T23:59:59.000Z
+        - Multi-day (Jan 29 to Feb 2): start=2026-01-29T00:00:00.000Z, end=2026-02-02T23:59:59.000Z
+        - This week: start=2026-01-27T00:00:00.000Z, end=2026-02-02T23:59:59.000Z
+
+        When to Use This Tool
+        Use when user wants to check availability before booking.
+        Must be called before attempting to book an appointment.
+
+        Trigger Keywords
+        available slots, check availability, when can I book, is the doctor free,
+        slots for this week, slots from X to Y date
+ 
+        Returns: List of slots with start_time, end_time, and available (boolean).
+
+        """
+        await ctx.info(f"[get_appointment_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} from {start_date} to {end_date}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
+            
+            slot_count = len(result.get('slots', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[get_appointment_slots] Completed successfully - {slot_count} slots available\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_slots] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "read", "dates", "availability"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_available_dates(
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        start_date: Annotated[Optional[str], "Start date YYYY-MM-DD (default: tomorrow). Must be today or future."] = None,
+        max_days: Annotated[int, "Maximum number of dates to return (default: 7, max: 10)"] = 7,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get available appointment dates for a doctor at a clinic.
+        
+        Returns dates that have at least one available slot within the specified range.
+        Use this tool to show users which dates have availability before drilling into specific slots.
+        
+        Behavior:
+        - If no start_date: Returns dates starting from tomorrow
+        - If start_date < today: Returns error (past dates not allowed)
+        - Max 10 dates returned (default: 7)
+        
+        Trigger Keywords:
+        available dates, when is doctor free, which days available, appointment dates,
+        doctor availability dates, open dates
+        
+        Returns:
+            List of dates (YYYY-MM-DD) with available slots
+        """
+        await ctx.info(f"[get_available_dates] Getting available dates for doctor {doctor_id} at clinic {clinic_id}")
+        
+        try:
+            # Determine start date
+            today = datetime.now().date()
+            tomorrow = today + timedelta(days=1)
+            
+            if start_date:
+                try:
+                    parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+                    if parsed_start < today:
+                        return {
+                            "error": f"Start date '{start_date}' is in the past. Please provide a date >= {today.strftime('%Y-%m-%d')}"
+                        }
+                    effective_start = parsed_start
+                except ValueError:
+                    return {
+                        "error": f"Invalid date format '{start_date}'. Use YYYY-MM-DD format."
+                    }
+            else:
+                effective_start = tomorrow
+            
+            # Cap max_days at 10
+            max_days = min(max_days, 10)
+            
+            # Calculate date range
+            end_date_calc = effective_start + timedelta(days=max_days - 1)
+            
+            # Format dates for API call (ISO 8601)
+            start_datetime = f"{effective_start.strftime('%Y-%m-%d')}T00:00:00.000Z"
+            end_datetime = f"{end_date_calc.strftime('%Y-%m-%d')}T23:59:59.000Z"
+            
+            await ctx.debug(f"Fetching slots from {start_datetime} to {end_datetime}")
+            
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            
+            # Fetch available dates - client returns common format
+            result = await appointment_service.get_available_dates(
+                doctor_id, clinic_id, start_datetime, end_datetime
+            )
+            
+            # Limit to max_days
+            available_dates = result.get('available_dates', [])[:max_days]
+            
+            await ctx.info(f"[get_available_dates] Found {len(available_dates)} dates with availability\n")
+            
+            return {
+                "available_dates": available_dates,
+                "date_range": {
+                    "start": effective_start.strftime('%Y-%m-%d'),
+                    "end": end_date_calc.strftime('%Y-%m-%d')
+                }
+            }
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[get_available_dates] Failed: {e.message}\n")
+            return {
+                "error": e.message
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "read", "slots", "availability"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_available_slots(
+        doctor_id: Annotated[str, "Doctor ID (from get_business_entities)"],
+        clinic_id: Annotated[str, "Clinic ID (from get_business_entities)"],
+        date: Annotated[str, "Date to check slots for (YYYY-MM-DD format)"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get available time slots for a specific date.
+        
+        Simple slot lookup for a single day. Returns available slots in unified contract format.
+        Use after get_available_dates to show specific time options.
+        
+        Trigger Keywords:
+        available slots, time slots, what times available, appointment times,
+        slots on [date], openings on [date]
+        
+        Returns:
+            Unified contract with all_slots (24h format), slot_categories, pricing, metadata
+        """
+        await ctx.info(f"[get_available_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
+        
+        try:
+            # Validate date format and not in past
+            today = datetime.now().date()
+            try:
+                parsed_date = datetime.strptime(date, "%Y-%m-%d").date()
+                if parsed_date < today:
+                    return {
+                        "error": f"Date '{date}' is in the past. Please provide a date >= {today.strftime('%Y-%m-%d')}"
+                    }
+            except ValueError:
+                return {
+                    "error": f"Invalid date format '{date}'. Use YYYY-MM-DD format."
+                }
+            
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            
+            # Fetch slots - client returns common contract format
+            response_data = await appointment_service.get_available_slots(
+                doctor_id, clinic_id, date
+            )
+            
+            await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
+            
+            return response_data
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[get_available_slots] Failed: {e.message}\n")
+            return {
+                "error": e.message
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "write", "book", "create"},
+        annotations=write_tool_annotations()
+    )
+    async def book_appointment(
+        booking: AppointmentBookingRequest,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Smart appointment booking with automatic availability checking and alternate slot suggestions.
+        
+        This tool now:
+        1. Automatically checks slot availability before booking
+        2. Books immediately if the requested slot is available
+        3. Suggests up to 6 nearest alternative slots if unavailable (before and after requested time)
+        
+        When to Use This Tool
+        Use this tool when the user wants to book an appointment. The tool handles availability checking automatically.
+        
+        Trigger Keywords / Phrases
+        book appointment, schedule visit, confirm booking, book with doctor, 
+        schedule at noon / morning / afternoon, fix appointment, make an appointment
+        
+        What to Return
+        - If slot available: Returns booking confirmation with appointment_id
+        - If slot unavailable: Returns alternate slot suggestions (up to 6 nearest slots)
+        """
+        # Convert Pydantic model to dict for deduplication
+        booking_dict = booking.model_dump(exclude_none=True)
+        
+        # Check for duplicate request
+        dedup = get_deduplicator()
+        dedup_params = {
+            "patient_id": booking.patient_id,
+            "doctor_id": booking.doctor_id,
+            "clinic_id": booking.clinic_id,
+            "date": booking.date,
+            "start_time": booking.start_time,
+            "end_time": booking.end_time
+        }
+        is_duplicate, cached_response = dedup.check_and_get_cached("book_appointment", **dedup_params)
+        
+        if is_duplicate and cached_response:
+            await ctx.info("DUPLICATE REQUEST - Returning cached appointment response")
+            return cached_response
+        
+        await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
+        await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            
+            # Delegate to client - all orchestration logic is in the client layer
+            result = await appointment_service.book_appointment_with_validation(
+                patient_id=booking.patient_id,
+                doctor_id=booking.doctor_id,
+                clinic_id=booking.clinic_id,
+                date=booking.date,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                mode=booking.mode,
+                reason=booking.reason,
+            )
+            
+            if result.get("success"):
+                appointment_id = result.get('data', {}).get('appointment_id') or result.get('data', {}).get('id')
+                await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
+                # Cache the successful response
+                dedup.cache_response("book_appointment", result, **dedup_params)
+            elif result.get("slot_unavailable"):
+                await ctx.info(f"[book_appointment] Slot unavailable, returning alternatives\n")
+            else:
+                await ctx.error(f"[book_appointment] Failed: {result.get('error', {}).get('message')}\n")
+            
+            return result
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[book_appointment] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+        
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "list", "enriched"},
+        annotations=readonly_tool_annotations() 
+    )
+    async def show_appointments_enriched(
+        patient_id: Annotated[Optional[str], "Filter by patient (cannot use with dates)"] = None,
+        doctor_id: Annotated[Optional[str], "Filter by doctor"] = None,
+        clinic_id: Annotated[Optional[str], "Filter by clinic"] = None,
+        start_date: Annotated[Optional[str], "From date YYYY-MM-DD (cannot use with patient_id)"] = None,
+        end_date: Annotated[Optional[str], "To date YYYY-MM-DD (cannot use with patient_id)"] = None,
+        page_no: int = 0,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve appointments with enriched details including patient information, doctor profiles, clinic details, and appointment status.
+
+        When to Use This Tool
+        Use this tool when the user wants to view appointment information with full context.
+        This is the preferred tool for listing appointments and should be used instead of basic appointment listing tools unless minimal data is required.
+        Suitable for patient views, doctor schedules, and date-based appointment reviews.
+
+        Filter rules:
+        - patient_id alone: All patient appointments
+        - dates: Appointments in range (no patient_id)
+        - doctor_id/clinic_id: Combine with dates.
+
+        Trigger Keywords / Phrases
+        show my appointments, list appointments, upcoming appointments, today’s appointments,
+        doctor schedule, clinic appointments, appointment history, appointments this week
+
+        Returns
+        Appointments with doctor names, clinic addresses, status
+        If no appointments match the filters, returns an empty appointments array.
+        """
+        filters = [f for f in [f"doctor={doctor_id}" if doctor_id else None, 
+                              f"clinic={clinic_id}" if clinic_id else None,
+                              f"patient={patient_id}" if patient_id else None,
+                              f"dates={start_date} to {end_date}" if start_date or end_date else None] if f]
+        filter_str = ", ".join(filters) if filters else "no filters"
+        await ctx.info(f"[show_appointments_enriched] Getting enriched appointments with {filter_str}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.show_appointments_enriched(
+                doctor_id=doctor_id,
+                clinic_id=clinic_id,
+                patient_id=patient_id,
+                start_date=start_date,
+                end_date=end_date,
+                page_no=page_no
+            )
+            
+            appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[show_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[show_appointments_enriched] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "read", "list", "basic"},
+        annotations=readonly_tool_annotations()
+    )
+    async def show_appointments_basic(
+        doctor_id: Annotated[Optional[str], "Doctor ID"] = None,
+        clinic_id: Annotated[Optional[str], "Clinic ID"] = None,
+        patient_id: Annotated[Optional[str], "Patient ID"] = None,
+        start_date: Annotated[Optional[str], "Start date YYYY-MM-DD"] = None,
+        end_date: Annotated[Optional[str], "End date YYYY-MM-DD, (start_date+1)<=end_date"] = None,
+        page_no: Annotated[int, "Pagination page number"] = 0,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve a list of appointments with basic data containing entity IDs only, without patient, doctor, or clinic details.
+                
+        When to Use This Tool
+        Use this tool only when raw appointment records are required. Use show_appointments_enriched otherwise.
+        This tool is intended for internal workflows, debugging, or follow-up calls where entity details will be resolved separately.
+        
+        Trigger Keywords / Phrases
+        raw appointments, appointment ids, basic appointment list, internal lookup,
+        debug appointments, lightweight appointment data
+        
+        Returns:
+        Basic appointments with entity IDs only
+        If no appointments match the filters, returns an empty appointments array.
+        Timestamps are Unix epoch (UTC-based).
+        IMPORTANT: Always use Python/bash to convert timestamps - never do mental math. Use the below code.
+        python3 -c "import datetime; print(datetime.datetime.fromtimestamp(TIMESTAMP, tz=datetime.timezone(datetime.timedelta(hours=5, minutes=30))).strftime('%I:%M %p IST'))"
+
+
+        """
+        await ctx.info(f"[show_appointments_basic] Getting basic appointments - page {page_no}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.show_appointments_basic(
+                doctor_id=doctor_id,
+                clinic_id=clinic_id,
+                patient_id=patient_id,
+                start_date=start_date,
+                end_date=end_date,
+                page_no=page_no
+            )
+            
+            appointment_count = len(result.get('appointments', [])) if isinstance(result, dict) else 0
+            await ctx.info(f"[show_appointments_basic] Completed successfully - {appointment_count} appointments\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[show_appointments_basic] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        enabled=False,   
+        tags={"appointment", "read", "details", "enriched"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_appointment_details_enriched(
+        appointment_id: Annotated[str, "Appointment ID"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive appointment details with complete patient, doctor, and clinic information.
+
+        When to Use This Tool
+        Use this tool when the user wants to view complete information for a specific appointment.
+        This is the preferred tool for fetching single appointment details and should be used instead of basic appointment detail tools whenever available.
+        It eliminates the need for additional API calls to resolve related entities.
+        
+        Trigger Keywords / Phrases
+        appointment details, view appointment, show appointment information, appointment summary,
+        doctor and clinic details, patient appointment record, appointment status
+
+        What to Return
+        Complete appointment details with enriched patient, doctor, and clinic information
+        If the appointment is not found, returns an appropriate error response.
+
+        """
+        await ctx.info(f"[get_appointment_details_enriched] Getting enriched details for appointment: {appointment_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_appointment_details_enriched(appointment_id, partner_id)
+            
+            await ctx.info(f"[get_appointment_details_enriched] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_details_enriched] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "details", "basic"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_appointment_details_basic(
+        appointment_id: Annotated[str, "Appointment ID"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get basic appointment details (IDs only).
+        
+        Consider using get_appointment_details_enriched instead for complete information.
+        Only use this if you specifically need raw appointment data without patient/doctor/clinic details.
+        
+        Trigger Keywords / Phrases
+        basic appointment details, appointment ids, raw appointment record,
+        internal lookup, debug appointment, minimal appointment data
+
+        Returns:
+        Basic appointment details with entity IDs only
+        If the appointment is not found, returns an appropriate error response.
+        """
+        await ctx.info(f"[get_appointment_details_basic] Getting basic details for appointment: {appointment_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_appointment_details_basic(appointment_id, partner_id)
+            
+            await ctx.info(f"[get_appointment_details_basic] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_appointment_details_basic] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "patient", "list", "enriched"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_patient_appointments_enriched(
+        patient_id: Annotated[str, "Patient ID"],
+        limit: Annotated[Optional[int], "Max records to return"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Retrieve all appointments for a specific patient with enriched doctor and clinic details.
+
+        When to Use This Tool
+        Use this tool when the user wants to view a patient’s appointment history or upcoming appointments with full contextual information.
+        This is the preferred tool for listing appointments for a single patient and should be used instead of basic patient appointment listing tools.
+        It provides complete doctor and clinic details without requiring additional follow-up calls.
+        
+        Trigger Keywords / Phrases
+        patient appointments, my appointments, appointment history,
+        upcoming appointments for patient, past visits, patient visit records
+
+        What to Return        
+        List of enriched appointments for the patient with doctor and clinic information
+        If the patient has no appointments, returns an empty appointments array.
+        """
+        await ctx.info(f"[get_patient_appointments_enriched] Getting enriched appointments for patient: {patient_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
+            
+            appointment_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[get_patient_appointments_enriched] Completed successfully - {appointment_count} appointments\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_patient_appointments_enriched] Failed: {e.message}\n")
+            client = EkaEMRClient(access_token=token.token if token else None, custom_headers=get_extra_headers())
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_patient_appointments_enriched(patient_id, limit)
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "read", "patient", "list", "basic"},
+        annotations=readonly_tool_annotations()
+    )
+    async def get_patient_appointments_basic(
+        patient_id: Annotated[str, "Patient ID"],
+        limit: Annotated[Optional[int], "Max records to return"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Get basic appointments for a specific patient (IDs only).
+        
+        When to use this tool
+        Only use this if you specifically need raw appointment data without doctor/clinic details.
+        Otherwise consider using get_patient_appointments_enriched instead for complete information.
+        
+        Trigger Keywords / Phrases
+        basic patient appointments, patient appointment ids, raw patient visits,
+        internal lookup, debug patient appointments, minimal appointment data
+        
+        Returns:
+            Basic appointments with entity IDs only
+            If the patient has no appointments, returns an empty appointments array.
+
+        """
+        await ctx.info(f"[get_patient_appointments_basic] Getting basic appointments for patient: {patient_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.get_patient_appointments_basic(patient_id, limit)
+            
+            appointment_count = len(result) if isinstance(result, list) else 0
+            await ctx.info(f"[get_patient_appointments_basic] Completed successfully - {appointment_count} appointments\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[get_patient_appointments_basic] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        enabled=False,
+        tags={"appointment", "write", "update"},
+        annotations=write_tool_annotations()
+    )
+    async def update_appointment(
+        appointment_id: Annotated[str, "Appointment ID"],
+        update_data: Annotated[Dict[str, Any], "Fields to update"],
+        partner_id: Annotated[Optional[str], "Use partner appointment ID if set"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Update an existing appointment.
+
+        When to Use This Tool
+        Use this tool when the user wants to change an existing appointment, such as rescheduling, cancelling, or updating appointment-related details.
+        This tool should be used only after a valid appointment has been identified.
+        User intent should be explicit before performing any update, as this is a write operation.
+        
+        Trigger Keywords / Phrases
+        reschedule appointment, update appointment, cancel appointment, change appointment time,
+        modify booking, update status, mark appointment, edit appointment
+
+        Returns:
+            Updated appointment details
+            If the update fails, returns an error response. This action should not be retried automatically without user confirmation.
+
+        """
+        await ctx.info(f"[update_appointment] Updating appointment {appointment_id} - fields: {list(update_data.keys())}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.update_appointment(appointment_id, update_data, partner_id)
+            
+            await ctx.info(f"[update_appointment] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[update_appointment] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "write", "complete", "status"},
+        annotations=write_tool_annotations()
+    )
+    async def complete_appointment(
+        appointment_id: Annotated[str, "Appointment ID"],
+        completion_data: Annotated[Dict[str, Any], "Completion status and notes"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Mark an appointment as completed.
+
+        When to Use This Tool
+        Use this tool when the appointment has concluded and needs to be marked as completed in the system.
+        This tool should be called only after the appointment has taken place.
+        User intent should be explicit, as this action updates the appointment’s final state.
+
+        Trigger Keywords / Phrases
+        complete appointment, mark as completed, finish appointment,
+        close visit, appointment done, visit completed
+        
+        Returns:
+            Completion confirmation with updated appointment status.
+            If completion fails, returns an error response. This action should not be retried automatically without user confirmation.
+
+        """
+        await ctx.info(f"[complete_appointment] Completing appointment: {appointment_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.complete_appointment(appointment_id, completion_data)
+            
+            await ctx.info(f"[complete_appointment] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[complete_appointment] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        tags={"appointment", "write", "cancel", "destructive"},
+        annotations=write_tool_annotations(destructive=True)
+    )
+    async def cancel_appointment(
+        appointment_id: Annotated[str, "Appointment ID"],
+        cancel_data: Annotated[Dict[str, Any], "Cancellation reason and notes"],
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Cancel an appointment.
+
+        When to Use This Tool
+        Use this tool when the user explicitly wants to cancel an appointment.
+        This action should be performed only after confirming the correct appointment with the user.
+        Because this is a destructive write operation, intent must be clear and unambiguous.
+        
+        Args:
+            appointment_id: Appointment's unique identifier
+            cancel_data: Cancellation details including reason and notes
+        
+        Returns:
+            Cancellation confirmation with updated appointment status
+        """
+        await ctx.info(f"[cancel_appointment] Cancelling appointment: {appointment_id}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            result = await appointment_service.cancel_appointment(appointment_id, cancel_data)
+            
+            await ctx.info(f"[cancel_appointment] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[cancel_appointment] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+    @mcp.tool(
+        enabled=True,
+        tags={"appointment", "write", "reschedule"},
+        annotations=write_tool_annotations()
+    )
+    async def reschedule_appointment(
+        reschedule_data: RescheduleAppointmentRequest,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Reschedule an appointment to a new date/time.
+
+        When to Use This Tool
+        Use this tool when the user explicitly wants to move an existing appointment to a different date or time.
+        This tool should be used only after confirming the target appointment and the new timing.
+        It is recommended to verify availability for the new time slot before rescheduling.
+
+        Trigger Keywords / Phrases
+        reschedule appointment, move appointment, change appointment time,
+        shift booking, postpone appointment, appointment moved
+        
+        Returns:
+            Rescheduled appointment details with new timing
+            If rescheduling fails, returns an error response. This action should not be retried automatically without user confirmation.
+
+        """
+        await ctx.info(f"[reschedule_appointment] Rescheduling appointment: {RescheduleAppointmentRequest}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service  = AppointmentService(client)
+            reschedule_data_json = reschedule_data.model_dump(exclude_none=True)
+            result = await appointment_service.reschedule_appointment(reschedule_data_json)
+            
+            await ctx.info("[reschedule_appointment] Completed successfully\n")
+            
+            return {"success": True, "data": result}
+        except EkaAPIError as e:
+            await ctx.error(f"[reschedule_appointment] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
+    
+
+
+# This function is now handled by the AppointmentService class
+# Keeping for backward compatibility if needed
+async def _enrich_appointments_data(client: EkaEMRClient, appointments_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Unified function to enrich appointment data with patient, doctor, and clinic details.
+    Works with both single appointments and lists of appointments.
+    """
+    try:
+        # Handle different input structures
+        appointments_list = []
+        if "appointments" in appointments_data:
+            appointments_list = appointments_data.get("appointments", [])
+        elif isinstance(appointments_data, list):
+            appointments_list = appointments_data
+        elif isinstance(appointments_data, dict) and appointments_data.get("appointment_id"):
+            # Single appointment
+            appointments_list = [appointments_data]
+        else:
+            # Unknown structure, return as is
+            return appointments_data
+        
+        if not appointments_list:
+            return appointments_data
+        
+        enriched_appointments = []
+        
+        # Cache for avoiding duplicate API calls
+        patients_cache = {}
+        doctors_cache = {}
+        clinics_cache = {}
+        
+        for appointment in appointments_list:
+            enriched_appointment = appointment.copy()
+            
+            # Enrich with patient details
+            patient_id = appointment.get("patient_id")
+            if patient_id:
+                patient_info = await get_cached_data(
+                    client.get_patient_details, patient_id, patients_cache
+                )
+                if patient_info:
+                    enriched_appointment["patient_details"] = extract_patient_summary(patient_info)
+            
+            # Enrich with doctor details
+            doctor_id = appointment.get("doctor_id")
+            if doctor_id:
+                doctor_info = await get_cached_data(
+                    client.get_doctor_profile, doctor_id, doctors_cache
+                )
+                if doctor_info:
+                    enriched_appointment["doctor_details"] = extract_doctor_summary(doctor_info)
+            
+            # Enrich with clinic details
+            clinic_id = appointment.get("clinic_id")
+            if clinic_id:
+                clinic_info = await get_cached_data(
+                    client.get_clinic_details, clinic_id, clinics_cache
+                )
+                if clinic_info:
+                    enriched_appointment["clinic_details"] = extract_clinic_summary(clinic_info)
+            
+            enriched_appointments.append(enriched_appointment)
+        
+        # Return enriched data with original structure preserved
+        if "appointments" in appointments_data:
+            result = appointments_data.copy()
+            result["appointments"] = enriched_appointments
+            return result
+        elif isinstance(appointments_data, list):
+            return enriched_appointments
+        else:
+            # Single appointment case
+            return enriched_appointments[0] if enriched_appointments else appointments_data
+        
+    except Exception as e:
+        logger.warning(f"Failed to enrich appointments data: {str(e)}")
+        return appointments_data
+
+
+
+#Appointment ID: api-6ae89715-bda5-4bf0-9aa1-69265dce9a4b
+
+

@@ -1,0 +1,121 @@
+"""Pydantic models for tool parameters and validation."""
+
+from datetime import datetime
+from typing import Optional, Literal
+from pydantic import BaseModel, Field, field_validator
+
+DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+TIME_24H_PATTERN = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+
+class PatientData(BaseModel):
+    fln: str = Field(
+        ..., 
+        description="Full legal name"
+    )
+    dob: str = Field(
+        ..., 
+        description="Date of birth (YYYY-MM-DD)"
+    )
+    gen: str = Field(
+        ..., 
+        description="Gender"
+    )
+    mobile: Optional[str] = Field(
+        None, 
+        description="Mobile number with country code (+91...)"
+    )
+    email: Optional[str] = Field(
+        None, 
+        description="Email address"
+    )
+    address: Optional[str] = Field(
+        None, 
+        description="Physical address"
+    )
+
+class AppointmentBookingRequest(BaseModel):
+    """Appointment booking request model matching Eka Care API specification."""
+    
+    patient_id: str = Field(
+        ...,
+        description="Patient's unique identifier (oid from patient lookup)",
+    )
+    doctor_id: str = Field(
+        ...,
+        description="Doctor's unique identifier from get_business_entities",
+    )
+    clinic_id: str = Field(
+        ...,
+        description="Clinic's unique identifier from get_business_entities",
+    )
+    date: str = Field(
+        ...,
+        description="Appointment date in YYYY-MM-DD format (today or future)",
+    )
+    start_time: str = Field(
+        ...,
+        description="Start time in HH:MM 24-hour format (e.g., 15:00 for 3pm, 12:00 for noon)",
+    )
+    end_time: str = Field(
+        ...,
+        description="End time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
+    )
+    mode: Literal["INCLINIC", "VIDEO", "AUDIO"] = Field(
+        default="INCLINIC",
+        description="Appointment mode: INCLINIC (in-person), VIDEO (telemedicine), or AUDIO (phone call)"
+    )
+    reason: Optional[str] = Field(
+        None,
+        description="Reason for appointment or chief complaint",
+        max_length=500,
+        examples=["Regular checkup", "Follow-up consultation"]
+    )
+    
+    @field_validator('date')
+    @classmethod
+    def validate_date_not_past(cls, v: str) -> str:
+        """Validate that appointment date is not in the past."""
+        try:
+            appointment_date = datetime.strptime(v, "%Y-%m-%d").date()
+            today = datetime.now().date()
+            if appointment_date < today:
+                raise ValueError(f"Appointment date cannot be in the past. Provided: {v}, Today: {today}")
+            return v
+        except ValueError as e:
+            if "does not match format" in str(e):
+                raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Provided: {v}")
+            raise
+    
+    @field_validator('end_time')
+    @classmethod
+    def validate_end_after_start(cls, v: str, info) -> str:
+        """Validate that end_time is after start_time."""
+        if v is not None and 'start_time' in info.data:
+            start = info.data['start_time']
+            if v <= start:
+                raise ValueError(f"End time ({v}) must be after start time ({start})")
+        return v
+    
+
+class RescheduleAppointmentRequest(BaseModel):
+    """Appointment reschedule request model"""
+    
+    appointment_id: str = Field(
+        ...,
+        description="Appointment's unique identifier (oid from appointment lookup)",
+    )
+    new_date: str = Field(
+        ...,
+        description="New date in YYYY-MM-DD format (today or future)",
+        pattern=DATE_PATTERN,
+    )
+    new_start_time: str = Field(
+        ...,
+        description="New start time in HH:MM 24-hour format (e.g., 15:00 for 3pm, 12:00 for noon)",
+        pattern=TIME_24H_PATTERN,
+    )
+    new_end_time: Optional[str] = Field(
+        None,
+        description="New end time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
+        pattern=TIME_24H_PATTERN,
+    )

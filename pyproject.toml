@@ -1,0 +1,85 @@
+[project]
+name = "eka-mcp-sdk"
+dynamic = ["version"]
+description = "MCP Server for Eka.care APIs - Healthcare data integration for LLM applications"
+authors = [
+    { name = "Eka.care Team", email = "ekaconnect@eka.care" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["mcp", "healthcare", "api", "eka.care", "llm", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "fastmcp==2.14.5",
+    "httpx>=0.24.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "py-key-value-aio[redis]",
+    "pyjwt",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/eka-care/eka-mcp-sdk"
+Documentation = "https://developer.eka.care"
+Repository = "https://github.com/eka-care/eka-mcp-sdk"
+Issues = "https://github.com/eka-care/eka-mcp-sdk/issues"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.scripts]
+eka-mcp-server = "eka_mcp_sdk.server:main"
+
+[project.entry-points."eka_mcp_sdk.plugins"]
+doctor_tools = "eka_mcp_sdk.tools.doctor_tools:register_doctor_tools"
+appointment_tools = "eka_mcp_sdk.tools.appointment_tools:register_appointment_tools"
+patient_tools = "eka_mcp_sdk.tools.patient_tools:register_patient_tools"
+prescription_tools = "eka_mcp_sdk.tools.prescription_tools:register_prescription_tools"
