@@ -162,7 +162,8 @@ class AppointmentService:
         doctor_id: str,
         clinic_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
-        preferred_slot_time: Optional[str] = None
+        preferred_slot_time: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.

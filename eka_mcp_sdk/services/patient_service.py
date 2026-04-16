@@ -239,7 +239,6 @@ class PatientService:
         self,
         method: str,
         mobile_number: Optional[str] = None,
-        country_code: Optional[str] = None,
         email_address: Optional[str] = None,
         meta: Optional[Dict[Any, Any]] = None,
     ) -> Dict[str, Any]:
@@ -249,12 +248,11 @@ class PatientService:
         Args:
             method: Authentication method to use
             mobile_number: Mobile number of the patient
-            country_code: Country code of the mobile number
             email_address: Email address of the patient
             meta: Additional metadata for authentication
         """
         return await self.client.authentication_elicitation(
-            method, mobile_number, country_code, email_address, meta
+            method, mobile_number, email_address, meta
         )
 
     async def list_all_patient_profiles(self) -> Dict[str, Any]:

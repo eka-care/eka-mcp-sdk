@@ -533,8 +533,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     )
     async def authentication_elicitation(
         method: Annotated[Literal["mobile", "email"], "Authentication method to use"] = "mobile",
-        mobile_number: Annotated[Optional[str], "Mobile number to verify (without country code)"]=None,
-        country_code: Annotated[Optional[str], "Country code of the mobile number"]="+91",
+        mobile_number: Annotated[Optional[str], "Mobile number to verify (10 digits without country code)"]=None,
         email_address: Annotated[Optional[str], "Email address of the user."]=None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
@@ -555,7 +554,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             patient_service = PatientService(client)
-            return await patient_service.authentication_elicitation(method, mobile_number, country_code, email_address, meta)
+            return await patient_service.authentication_elicitation(method, mobile_number, email_address, meta)
         except EkaAPIError as e:
             await ctx.error(f"[authentication_elicitation] Failed: {e.message}\n")
             return {

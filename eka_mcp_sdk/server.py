@@ -8,7 +8,7 @@ from fastmcp.server.context import Context
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from eka_mcp_sdk.config.settings import DEFAULT_EKAEMR_TOOLS, settings
+from eka_mcp_sdk.config.settings import settings
 from eka_mcp_sdk.tools.doctor_tools import register_doctor_tools
 from eka_mcp_sdk.tools.abha_tools import register_abha_tools
 
@@ -77,11 +77,8 @@ def create_mcp_server() -> FastMCP:
             WORKSPACE_TOOLS_DICT = settings.workspace_tools_dict
             if WORKSPACE_TOOLS_DICT is str:
                 WORKSPACE_TOOLS_DICT = json.loads(WORKSPACE_TOOLS_DICT)
-            allowed_tools_list = WORKSPACE_TOOLS_DICT.get(workspace_id)
-            if not allowed_tools_list:
-                logger.warning(f"No allowed tools list found for workspace: {workspace_id}, using default eka emr tools")
-                allowed_tools_list = DEFAULT_EKAEMR_TOOLS
-            allowed_tool_names = set(allowed_tools_list)
+
+            allowed_tool_names = set(WORKSPACE_TOOLS_DICT.get(workspace_id))
 
             # Filter tools to only those allowed for this workspace
             filtered_tools = [
