@@ -1,0 +1,53 @@
+{
+  "total_documents": 106,
+  "unique_cities": [
+    "Bengaluru",
+    "Hosur"
+  ],
+  "unique_states": [
+    "Karnataka",
+    "Tamil Nadu"
+  ],
+  "unique_languages": [],
+  "unique_genders": [],
+  "unique_specialities": [
+    "Allergy Specialist",
+    "Fetal Medicine",
+    "General Medicine",
+    "Intensivist",
+    "Neonatology",
+    "Not Specified",
+    "Obstetrics & Gynecology",
+    "Paediatric Dentist",
+    "Paediatrics Sub-Speciality",
+    "Pediatric Surgery & Urology",
+    "Pediatrics",
+    "Physiotherapist",
+    "Radiology",
+    "Reproductive Medicine"
+  ],
+  "schema_version": "v5",
+  "schema_features": {
+    "single_doc_per_doctor": true,
+    "multi_value_hospitals": true,
+    "fuzzy_search": [
+      "name",
+      "speciality",
+      "hospital"
+    ],
+    "exact_match": [
+      "gender",
+      "city",
+      "state",
+      "is_active"
+    ],
+    "range_queries": [
+      "experience"
+    ],
+    "multi_value_match": [
+      "languages",
+      "city",
+      "state"
+    ]
+  }
+}
