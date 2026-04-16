@@ -1,0 +1,15 @@
+Speciality ID,Speciality Name,Speciality Alias
+1,Allergy Specialist,"Allergist, Immunologist, Allergy & Immunology"
+2,Fetal Medicine,"Maternal-Fetal Medicine, MFM, Perinatology, Feto-maternal"
+3,General Medicine,"Internal Medicine, General Physician, GP"
+4,Intensivist,"Critical Care, ICU Specialist, Critical Care Medicine"
+5,Neonatology,"Newborn Care, NICU, Neonatal Medicine, Neonatologist"
+6,Not Specified,
+7,Obstetrics & Gynecology,"OB-GYN, Gynaecology, Gynecology, Obstetrics, Women's Health, OBG"
+8,Paediatric Dentist,"Pediatric Dentistry, Kids Dentist, Child Dental"
+9,Paediatrics Sub-Speciality,"Paediatric Subspecialty, Pediatric Subspecialty"
+10,Pediatric Surgery & Urology,"Pediatric Surgeon, Pediatric Urologist, Paediatric Surgery"
+11,Pediatrics,"Paediatrics, Child Health, Children's Medicine, Paediatrician"
+12,Physiotherapist,"Physiotherapy, Physical Therapy, Rehab, PT"
+13,Radiology,"Imaging, Diagnostic Radiology, X-Ray, Ultrasound, Scan"
+14,Reproductive Medicine,"IVF, Fertility, ART, IUI, Infertility Treatment"
