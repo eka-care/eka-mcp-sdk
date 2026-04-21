@@ -575,7 +575,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         city: Annotated[Optional[str], "Filter by city"] = None,
         gender: Annotated[Optional[str], "Filter by gender (male/female)"] = None,
         ctx: Context = CurrentContext()
-    ) -> Dict[str, Any]:
+    ):
         """
         Search for doctors by various criteria.
         
@@ -587,7 +587,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         female doctor, doctor by specialty
         
         Returns:
-            List of matching doctors with their details
+            List of matching doctors with their details or UI component for doctor cards for elicitation.
         """
         await ctx.info(f"[doctor_discovery_tool] Searching - name: {doctor_name}, specialty: {specialty}, city: {city}, gender: {gender}")
         
@@ -607,8 +607,8 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 city=city,
                 gender=gender,
             )
-            
-            result["is_elicitation"] = True
+            if isinstance(result, dict):
+                result["is_elicitation"] = True
             return result
             
         except EkaAPIError as e:

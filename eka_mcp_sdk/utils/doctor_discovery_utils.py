@@ -87,6 +87,7 @@ def build_elicitation_response(
     }
     """
     return {
+        "status": "success",
         "component": "doctor_card",
         "input": {
             "doctors": [doctor_entry],
