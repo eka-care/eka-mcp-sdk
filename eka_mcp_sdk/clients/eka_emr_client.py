@@ -359,13 +359,13 @@ class EkaEMRClient(BaseEMRClient):
         # 5. Fetch availability if clinic is resolved
         slot_confirmed = False
         if resolved_clinic_id:
-            availability_list, selected_date = await self._fetch_doctor_availability(
+            availability_list, preferred_date = await self._fetch_doctor_availability(
                 doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
             )
             if availability_list:
                 doctor_entry["availability"] = availability_list
-            if selected_date:
-                doctor_entry["selected_date"] = selected_date
+            if preferred_date:
+                doctor_entry["preferred_date"] = preferred_date
             
             # 6. Check if the specific preferred slot is available
             if preferred_date and preferred_slot_time:
