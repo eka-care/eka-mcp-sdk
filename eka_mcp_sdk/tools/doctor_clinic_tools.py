@@ -551,10 +551,6 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             
             await ctx.info(f"[doctor_availability_elicitation] Completed\n")
             
-            # Client returns slot_confirmed=True only when preferred date+time are available
-            # is_elicitation is False only when the specific slot is confirmed
-            result["is_elicitation"] = not result.get("slot_confirmed", False)
-            
             return result
             
         except EkaAPIError as e:
@@ -607,8 +603,6 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 city=city,
                 gender=gender,
             )
-            if isinstance(result, dict):
-                result["is_elicitation"] = True
             return result
             
         except EkaAPIError as e:
