@@ -10,9 +10,10 @@ from ..utils.eka_response_parsers import (
     parse_business_entities
 )
 from ..utils.doctor_discovery_utils import (
+    build_doctor_details,
+    build_elicitation_success_response,
     find_doctor_clinics,
     resolve_hospital_id,
-    build_doctor_details_for_card,
     build_elicitation_response,
     build_plain_availability_response
 )
@@ -332,67 +333,62 @@ class EkaEMRClient(BaseEMRClient):
             - slot_confirmed: True if preferred_date + preferred_slot_time are available
             - slot_confirmed: False if elicitation is needed (user must select)
         """
-        # 1. Fetch doctor profile
-        doctor_profile = await self.get_doctor_profile(doctor_id)
-        if not doctor_profile or not doctor_profile.get('id'):
-            return {"error": f"Doctor with ID '{doctor_id}' not found"}
-        
-        # 2. Get doctor's clinics from business entities
-        entities_response = await self.get_business_entities()
-        clinics_list = entities_response.get('clinics', [])
-        
-        # Find clinics where this doctor works
-        doctor_clinics = find_doctor_clinics(clinics_list, doctor_id)
-        
-        # 3. Resolve clinic_id
-        resolved_clinic_id = resolve_hospital_id(doctor_clinics, clinic_id)
-        
-        # 4. Build doctor entry with preferences
-        doctor_entry: Dict[str, Any] = {"doctor_id": doctor_id}
-        if resolved_clinic_id:
-            doctor_entry["hospital_id"] = resolved_clinic_id
-        if preferred_date:
-            doctor_entry["date_preference"] = preferred_date
-        if preferred_slot_time:
-            doctor_entry["slot_preference"] = preferred_slot_time
-        
-        # 5. Fetch availability if clinic is resolved
-        slot_confirmed = False
-        if resolved_clinic_id:
-            availability_list, preferred_date = await self._fetch_doctor_availability(
+        try:
+            if meta:
+                meta = dict(meta)
+            else:
+                meta = {}
+            selected_date = preferred_date
+            selected_slot = preferred_slot_time
+            # 1. Fetch doctor profile
+            doctor_profile = await self.get_doctor_profile(doctor_id)
+            if not doctor_profile or not doctor_profile.get('id'):
+                return {"error": f"Doctor with ID '{doctor_id}' not found"}
+
+            entities_response = await self.get_business_entities()
+            all_clinics_list = entities_response.get('clinics', [])
+
+            doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
+            doctor_details = build_doctor_details(doctor_profile, doctor_clinics)
+
+            resolved_clinic_id = resolve_hospital_id(doctor_clinics, clinic_id) or clinic_id
+
+            doctor_entry = {
+                "doctor_id": doctor_id,
+                "hospital_id": resolved_clinic_id,
+                "preferred_date": selected_date,
+                "availability": [],
+            }
+
+            availability_list, new_preferred_date = await self._fetch_doctor_availability(
                 doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
             )
             if availability_list:
                 doctor_entry["availability"] = availability_list
-            if preferred_date:
-                doctor_entry["preferred_date"] = preferred_date
-            
-            # 6. Check if the specific preferred slot is available
-            if preferred_date and preferred_slot_time:
+            if new_preferred_date:
+                doctor_entry["preferred_date"] = new_preferred_date
+
+            # User has already selected a slot
+            if selected_date and selected_slot:
                 slot_confirmed = self._is_slot_available(
-                    availability_list, preferred_date, preferred_slot_time
+                    availability_list, selected_date, selected_slot
                 )
-        
-        # 7. If slot is confirmed, return a simple confirmation response
-        if slot_confirmed:
-            return {
-                "slot_confirmed": True,
-                "doctor_id": doctor_id,
-                "hospital_id": resolved_clinic_id,
-                "date": preferred_date,
-                "time": preferred_slot_time,
-                "message": f"Slot available at {preferred_slot_time} on {preferred_date}",
-                "doctor_name": doctor_profile.get("name", ""),
-            }
-        
-        # 8. Build response based on client capability
-        doctor_details = build_doctor_details_for_card(doctor_profile, doctor_clinics)
-        if supports_elicitation:
-            response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
-        else:
-            response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
-        return response
-    
+                # if the slot user has selected is available, return success response, else continue with elicitation
+                if slot_confirmed:
+                    return build_elicitation_success_response(doctor_details, selected_date, selected_slot, resolved_clinic_id)
+
+            # 8. Build response based on client capability
+            if supports_elicitation:
+                response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+            else:
+                response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
+            return response
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch availability: {e}")
+            ValueError(f"Failed to get doctor availability: {e}")
+
+
     def _is_slot_available(
         self,
         availability_list: List[Dict[str, Any]],
