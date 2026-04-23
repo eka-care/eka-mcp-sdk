@@ -69,6 +69,44 @@ def parse_slots_to_date_map(
     
     return date_slots_map
 
+def build_elicitation_success_response(
+    doctor_id,
+    doctor_details,
+    selected_date,
+    selected_slot,
+    clinic_id
+):
+    res = {
+        "component": "success",
+        "is_elicitation": True,
+        "input": {},
+        "_meta": {
+            "disp_message": "I want to book an appointment at %s on %s with %s.",
+            "disp_toast_msg": "Selected %s slot on %s with %s",
+            "tool_result": {}
+        },
+        "status": "success"
+    }
+    doctor_name = doctor_details.get("name") or ""
+    if not doctor_name.lower().startswith("dr."):
+        doctor_name = "Dr. " + doctor_name
+    res["_meta"]["disp_toast_msg"] = res["_meta"]["disp_toast_msg"] % (selected_slot, selected_date, doctor_name)
+    res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (selected_slot, selected_date, doctor_name)
+    selected_hospital = None
+    for h in doctor_details.get("hospitals"):
+        if h.get("hospital_id") == clinic_id:
+            selected_hospital = h
+            break
+    doctor_name = doctor_details.get("name")
+    res["_meta"]["tool_result"] = {
+        "selected_doctor_name":doctor_name,
+        "selected_doctor_id":doctor_id,
+        "selected_hospital_details": selected_hospital,
+        "selected_slot":selected_slot,
+        "selected_date":selected_date,
+        "result": "This date and slot is available for booking. No further elicitation needed.",
+    }
+    return res
 
 def build_elicitation_response(
     doctor_id: str,
@@ -77,48 +115,41 @@ def build_elicitation_response(
 ) -> Dict[str, Any]:
     """
     Build the UI contract response for doctor availability elicitation.
-    
-    Callback format follows:
-    ToolCallbacks = {
-        [callback_name]: {
-            tool_name: string,
-            input_schema: Record<string, unknown>
-        }
-    }
     """
     return {
-        "status": "success",
+        "status": "progress",
+        "is_elicitation": True,
         "component": "doctor_card",
         "input": {
             "doctors": [doctor_entry],
             "doctor_details": {doctor_id: doctor_details}
         },
         "_meta": {
-            "callbacks": {
-                "get_doctor_details": {
-                    "tool_name": "get_doctor_profile_basic",
-                    "input_schema": {
-                        "doctor_id": {"type": "string", "description": "Doctor ID"}
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "preferred_date": {
+                        "type": "string",
+                        "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$",
+                        "description": "Enter the date to get slots for."
+                    },
+                    "preferred_slot_time": {
+                        "type": "string",
+                        "description": "Preferred slot time",
+                    },
+                    "doctor_id": {
+                        "type": "string",
+                        "description": "Doctor's identifier",
+                    },
+                    "hospital_id": {
+                        "type": "string",
+                        "description": "Hospital's identifier",
                     }
                 },
-                "get_available_dates": {
-                    "tool_name": "get_available_dates",
-                    "input_schema": {
-                        "doctor_id": {"type": "string", "description": "Doctor ID"},
-                        "clinic_id": {"type": "string", "description": "Clinic/Hospital ID"},
-                        "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
-                        "max_days": {"type": "integer", "description": "Max days to check (default: 7)"}
-                    }
-                },
-                "get_available_slots": {
-                    "tool_name": "get_available_slots",
-                    "input_schema": {
-                        "doctor_id": {"type": "string", "description": "Doctor ID"},
-                        "clinic_id": {"type": "string", "description": "Clinic/Hospital ID"},
-                        "date": {"type": "string", "description": "Date (YYYY-MM-DD)"}
-                    }
-                }
-            }
+                "required": [
+                    "doctor_id", "hospital_id", "preferred_date", "preferred_slot_time",
+                ]
+            },
         }
     }
 
@@ -141,6 +172,7 @@ def build_plain_availability_response(
         "availability": doctor_entry.get("availability", []),
         "date_preference": doctor_entry.get("date_preference"),
         "slot_preference": doctor_entry.get("slot_preference"),
+        "is_elicitation_needed": False
     }
 
 
@@ -159,7 +191,7 @@ def _extract_clinic_address(clinic: Dict[str, Any]) -> Dict[str, str]:
     return {'city': city, 'state': state}
 
 
-def build_doctor_details_for_card(
+def build_doctor_details(
     doctor_profile: Dict[str, Any],
     doctor_clinics: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
