@@ -216,7 +216,35 @@ class BaseEMRClient(BaseEkaClient):
     async def get_prescription_details(self, prescription_id: str) -> Dict[str, Any]:
         """Get Prescription details."""
         pass
-    
+
+    # ==================== Services Tools ====================
+    @abstractmethod
+    async def service_availability_elicitation(
+        self,
+        suggested_service_ids: Optional[List[str]] = None,
+        service_id: Optional[str] = None,
+        hospital_id: Optional[str] = None,
+        preferred_date: Optional[str] = None,
+        preferred_slot_time: Optional[str] = None,
+        supports_elicitation: bool = True,
+        meta: Optional[Dict[Any, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get Service availability for booking in UI contract format.
+        Returns service details, available dates, and slots with UI callbacks.
+        If supports_elicitation is False, returns plain availability data
+        without the doctor_card UI component.
+        """
+        pass
+
+    @abstractmethod
+    async def book_service(
+        self, booking_data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Book an appointment for a health package.
+        """
+        pass
 
     # ==================== Lifecycle ====================
     

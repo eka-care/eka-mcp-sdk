@@ -435,7 +435,6 @@ class EkaEMRClient(BaseEMRClient):
             else:
                 raise ValueError(f"Failed to fetch availability: {e}")
 
-
     def _is_slot_available(
         self,
         availability_list: List[Dict[str, Any]],
@@ -897,7 +896,22 @@ class EkaEMRClient(BaseEMRClient):
             method="GET",
             endpoint=f"/dr/v1/prescription/{prescription_id}"
         )
-    
+
+    # Service APIs
+    async def service_availability_elicitation(
+        self,
+        *args, **kwargs
+    ) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "service_availability_elicitation is not available for this workspace"}
+
+    async def book_service(
+        self,
+        *args, **kwargs
+    ) -> Dict[str, Any]:
+        """Not implemented for EkaEMRClient."""
+        return {"error": "Not implemented", "message": "book_service is not available for this workspace"}
+
     # Abstract method implementations (Not implemented for this client)
     async def get_appointments(self, *args, **kwargs) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
