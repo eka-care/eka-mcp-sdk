@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 TIME_24H_PATTERN = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+MOBILE_NUMBER_WITH_COUNTRY_CODE = r"^\+91[6-9]\d{9}$"
 
 class PatientData(BaseModel):
     fln: str = Field(
@@ -20,9 +21,9 @@ class PatientData(BaseModel):
         ..., 
         description="Gender"
     )
-    mobile: Optional[str] = Field(
-        None, 
-        description="Mobile number with country code (+91...)"
+    mobile: str = Field(
+        description="Mobile number with country code (+91...)",
+        pattern=MOBILE_NUMBER_WITH_COUNTRY_CODE
     )
     email: Optional[str] = Field(
         None, 
