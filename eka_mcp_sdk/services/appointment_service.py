@@ -523,3 +523,19 @@ class AppointmentService:
         except Exception as e:
             logger.warning(f"Failed to enrich appointments data: {str(e)}")
             return appointments_data
+    
+    # Book Health Package Appointment
+    async def book_service(self, booking_data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Book a service/package.
+        
+        Args:
+            booking_data: Booking details
+            
+        Returns:
+            Booked appointment details
+            
+        Raises:
+            EkaAPIError: If the API call fails
+        """
+        return await self.client.book_service(booking_data, meta)

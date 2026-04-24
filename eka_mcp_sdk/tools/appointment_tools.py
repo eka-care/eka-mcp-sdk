@@ -1,3 +1,4 @@
+from eka_mcp_sdk.tools.models import ServiceBookingRequest
 from eka_mcp_sdk.tools.models import RescheduleAppointmentRequest
 from typing import Any, Dict, Optional, List, Union, Annotated
 import logging
@@ -995,7 +996,81 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 }
             }
     
+    # healtcheck Tools
+    @mcp.tool(
+        tags={"appointment", "write", "book", "create"},
+        annotations=write_tool_annotations()
+    )
+    async def book_service(
+        booking: ServiceBookingRequest,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Books an appointment for a service/package at a specific time slot.
 
+
+        Use this tool when:
+        - user asks to book an appointment for a health package
+        - user provides all the required parameters
+        - if any required param is not available, gather it first from the user before calling this tool.
+        
+        Guidelines:
+        - NEVER use this tool when user is not authenticated.
+        - mobile_number: always use the authententicated mobile number. Never ask user mobile number directly.
+        - patient_uhid: always use the patient uhid from the authenticated user's session context.
+        - service_id: always use the service id from the authenticated user's session context.
+        - date: always use the date from the authenticated user's session context.
+        - slot_id: always use the slot id from the authenticated user's session context.
+        - slot_time: always use the slot time from the authenticated user's session context.
+        - use other patient data, if available in session context after user gets validated using mobile number.
+        """
+        meta = ctx.request_context.meta
+        input_params = booking.model_dump(exclude_none=True)
+        dedup = get_deduplicator()
+        is_duplicate, cached_response = dedup.check_and_get_cached("book_service", **input_params)
+        
+        if is_duplicate and cached_response:
+            await ctx.info("DUPLICATE REQUEST - Returning cached service booking response")
+            return cached_response
+        
+        await ctx.info(f"[book_service] Booking for patient {booking.patient_uhid}")
+        await ctx.debug(f"Details: {input_params}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            appointment_service = AppointmentService(client)
+            
+            # Delegate to client - all orchestration logic is in the client layer
+            result = await appointment_service.book_service(input_params, meta)
+            
+            if result.get("success"):
+                appointment_id = result.get('data', {}).get('appointment_id') or result.get('data', {}).get('id')
+                await ctx.info(f"[book_service] Success - ID: {appointment_id}\n")
+                # Cache the successful response
+                dedup.cache_response("book_health_package", result, **input_params)
+            elif result.get("slot_unavailable"):
+                await ctx.info("[book_health_package] Slot unavailable, returning alternatives\n")
+            else:
+                await ctx.error(f"[book_health_package] Failed: {result.get('error', {}).get('message')}\n")
+            
+            return result
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[book_health_package] Failed: {e.message}\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": e.message,
+                    "status_code": e.status_code,
+                    "error_code": e.error_code
+                }
+            }
 
 # This function is now handled by the AppointmentService class
 # Keeping for backward compatibility if needed
