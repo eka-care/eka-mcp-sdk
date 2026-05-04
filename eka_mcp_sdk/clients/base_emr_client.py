@@ -104,16 +104,6 @@ class BaseEMRClient(BaseEkaClient):
         """Get Doctor services."""
         pass
 
-    @abstractmethod
-    async def doctor_discovery(
-        self, doctor_name=None, specialty=None, city=None, gender=None, meta: Optional[Dict[Any, Any]] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Search for doctors using the local Tantivy index.
-        """
-        pass
-
-    
     # ==================== Appointment Operations ====================
     
     @abstractmethod

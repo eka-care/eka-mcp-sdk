@@ -497,37 +497,45 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         annotations=readonly_tool_annotations()
     )
     async def doctor_availability_elicitation(
-        doctor_id: Annotated[str, "Doctor ID (mandatory)"],
-        hospital_id: Annotated[Optional[str], "Hospital/Clinic ID (optional, if known)"] = None,
-        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format"] = None,
-        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format"] = None,
+        suggested_doctor_ids: Annotated[Optional[List[str]], "List of suggested doctor ids, as matching results of searching doctors"] = None,
+        doctor_id: Annotated[Optional[str], "Selected doctor id for elicitation from suggested_doctor_ids."] = None,
+        hospital_id: Annotated[Optional[str], "Facility/Hospital/Clinic ID of the selected doctor (optional, if known)"] = None,
+        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format, if user states preference for a date"] = None,
+        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format, if user states preference for a time slot"] = None,
         ctx: Context = CurrentContext()
     ) -> Dict[str, Any]:
         """
-        Check doctor availability for appointment booking.
-        
-        Behavior:
-        - If preferred_date AND preferred_slot_time are provided: checks if that specific slot 
-          is available and returns a direct response (non-elicitation).
-        - If date/time are NOT provided: returns elicitation response with available options 
-          for the user to choose from.
-        
-        Flow:
-        1. Fetch doctor details
-        2. Validate/resolve hospital (if provided & matches, use it; else return all doctor's hospitals)
-        3. Fetch available dates (check if preferred_date is available)
-        4. Fetch available slots (check if preferred_slot_time is available)
-        
-        Trigger Keywords:
-        check availability, doctor available, when can I book, appointment slots,
-        available times for doctor
-        
-        Returns:
-            - If date+time provided: Direct availability check result
-            - If date+time missing: UI component format (doctor_card) with availability and callbacks for elicitation
+        Interactive doctor availability and selection tool. Provides a UI for users to discover doctors, view availability, and pick a date/slot in one flow. Prefer this over listing doctor options in other ways like plain text or pills.
+
+        Typical use cases (guidance, not strict rules):
+        - Appointment booking intent or rescheduling flows
+        - When doctor availability or doctor details need to be discovered or displayed to the user
+        - After search_doctor_tool returns matches and the user needs to choose one
+        - When a specific doctor is already in context and the user wants to see slots
+
+        Parameters — pass exactly ONE of `suggested_doctor_ids` OR `doctor_id`:
+        - suggested_doctor_ids (list[str]): multiple candidate doctor IDs to present to the user
+        - doctor_id (str): a single doctor ID when one is already selected
+        - hospital_id (str, optional): include only when known
+        - preferred_date (str, optional): YYYY-MM-DD, only if user stated a date
+        - preferred_slot_time (str, optional): HH:MM, only if user stated a time
+
+        Sourcing IDs (important — do not hallucinate):
+        All IDs (doctor_id, suggested_doctor_ids, hospital_id) must come from one of:
+        – a prior search_doctor_tool result in this conversation
+        – a prior result of this tool
+        – explicit conversation context where the ID was provided
+        If no such ID is available, call search_doctor_tool first instead of guessing.
+
+        Constraints:
+        - Do not pass both suggested_doctor_ids and doctor_id
+        - Do not call with both empty
+        - Do not fabricate IDs, dates, or times not grounded in the conversation
+
+        Returns: Interactive selector showing available dates and time slots.
         """
         meta = ctx.request_context.meta
-        await ctx.info(f"[doctor_availability_elicitation] doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}, meta: {meta}")
+        await ctx.info(f"[doctor_availability_elicitation] suggested_doctor_ids: {suggested_doctor_ids}, doctor_id: {doctor_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}, meta: {meta}")
         
         try:
             token: AccessToken | None = get_access_token()
@@ -541,15 +549,16 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             
             # Delegate to client - all orchestration logic is in the client layer
             result = await doctor_clinic_service.doctor_availability_elicitation(
+                suggested_doctor_ids=suggested_doctor_ids,
                 doctor_id=doctor_id,
-                clinic_id=hospital_id,
+                hospital_id=hospital_id,
                 preferred_date=preferred_date,
                 preferred_slot_time=preferred_slot_time,
                 supports_elicitation=get_supports_elicitation(),
                 meta=meta
             )
             
-            await ctx.info(f"[doctor_availability_elicitation] Completed\n")
+            await ctx.info("[doctor_availability_elicitation] Completed\n")
             
             return result
             
@@ -559,59 +568,4 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 "error": e.message,
                 "status_code": e.status_code,
                 "error_code": e.error_code
-            }
-
-    @mcp.tool(
-        tags={"doctor", "search", "discovery"},
-        annotations=readonly_tool_annotations()
-    )
-    async def doctor_discovery_tool(
-        doctor_name: Annotated[Optional[str], "Filter by doctor name"] = None,
-        specialty: Annotated[Optional[str], "Filter by specialty (e.g., Cardiologist, Dermatologist)"] = None,
-        city: Annotated[Optional[str], "Filter by city"] = None,
-        gender: Annotated[Optional[str], "Filter by gender (male/female)"] = None,
-        ctx: Context = CurrentContext()
-    ):
-        """
-        Search for doctors by various criteria.
-        
-        Use this tool to discover doctors based on name, specialty, city, or gender.
-        At least one filter should be provided.
-        
-        Trigger Keywords:
-        find doctor, search doctor, doctors near me, cardiologist in delhi,
-        female doctor, doctor by specialty
-        
-        Returns:
-            List of matching doctors with their details or UI component for doctor cards for elicitation.
-        """
-        await ctx.info(f"[doctor_discovery_tool] Searching - name: {doctor_name}, specialty: {specialty}, city: {city}, gender: {gender}")
-        
-        try:
-            token: AccessToken | None = get_access_token()
-            access_token = token.token if token else None
-            workspace_id = get_workspace_id()
-            custom_headers = get_extra_headers()
-            client = ClientFactory.create_client(
-                workspace_id, access_token, custom_headers
-            )
-            doctor_clinic_service = DoctorClinicService(client)
-            
-            result = await doctor_clinic_service.doctor_discovery(
-                doctor_name=doctor_name,
-                specialty=specialty,
-                city=city,
-                gender=gender,
-            )
-            return result
-            
-        except EkaAPIError as e:
-            await ctx.error(f"[doctor_discovery_tool] Failed: {e.message}\n")
-            return {
-                "success": False,
-                "error": {
-                    "message": e.message,
-                    "status_code": e.status_code,
-                    "error_code": e.error_code
-                }
             }

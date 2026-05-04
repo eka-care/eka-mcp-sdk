@@ -89,8 +89,9 @@ class DoctorClinicService:
     
     async def doctor_availability_elicitation(
         self,
-        doctor_id: str,
-        clinic_id: Optional[str] = None,
+        suggested_doctor_ids: Optional[List[str]] = None,
+        doctor_id: Optional[str] = None,
+        hospital_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
         supports_elicitation: bool = True,
@@ -106,31 +107,13 @@ class DoctorClinicService:
             (or plain availability data if supports_elicitation is False)
         """
         return await self.client.doctor_availability_elicitation(
-            doctor_id, clinic_id, preferred_date, preferred_slot_time, supports_elicitation, meta
-        )
-    
-    async def doctor_discovery(
-        self,
-        doctor_name: Optional[str] = None,
-        specialty: Optional[str] = None,
-        city: Optional[str] = None,
-        gender: Optional[str] = None,
-        meta: Optional[Dict[Any, Any]] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Search for doctors by various criteria.
-        
-        Args:
-            doctor_name: Filter by doctor name
-            specialty: Filter by specialty
-            city: Filter by city
-            gender: Filter by gender
-            
-        Returns:
-            List of matching doctors
-        """
-        return await self.client.doctor_discovery(
-            doctor_name, specialty, city, gender
+            suggested_doctor_ids=suggested_doctor_ids,
+            doctor_id=doctor_id,
+            hospital_id=hospital_id,
+            preferred_date=preferred_date,
+            preferred_slot_time=preferred_slot_time,
+            supports_elicitation=supports_elicitation,
+            meta=meta
         )
     
     async def get_comprehensive_doctor_profile(
