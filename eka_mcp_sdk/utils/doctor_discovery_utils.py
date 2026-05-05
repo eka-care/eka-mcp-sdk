@@ -94,7 +94,7 @@ def build_elicitation_success_response(
     res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (selected_slot, selected_date, doctor_name)
     selected_hospital = None
     for h in doctor_details.get("hospitals"):
-        if h.get("hospital_id") == clinic_id:
+        if (h.get("hospital_id") or h.get("location_id") or "") == clinic_id:
             selected_hospital = h
             break
     doctor_name = doctor_details.get("name")
@@ -109,22 +109,18 @@ def build_elicitation_success_response(
     return res
 
 def build_elicitation_response(
-    doctor_id: str,
-    doctor_entry: Dict[str, Any],
-    doctor_details: Dict[str, Any]
+    doctor_entries: Dict[str, Any],
+    doctor_details: Dict[str, Any],
+    is_doctor_selected: bool,
+    is_date_slot_available: bool
 ) -> Dict[str, Any]:
     """
     Build the UI contract response for doctor availability elicitation.
     """
-    return {
-        "status": "progress",
-        "is_elicitation": True,
-        "component": "doctor_card",
-        "input": {
-            "doctors": [doctor_entry],
-            "doctor_details": {doctor_id: doctor_details}
-        },
-        "_meta": {
+    status = "success"
+    if not is_date_slot_available:
+        status = "progress"
+        meta = {
             "schema": {
                 "type": "object",
                 "properties": {
@@ -149,9 +145,24 @@ def build_elicitation_response(
                 "required": [
                     "doctor_id", "hospital_id", "preferred_date", "preferred_slot_time",
                 ]
-            },
+            }
+        }
+    else:
+        meta = None
+    
+
+    resp = {
+        "status": status,
+        "is_elicitation": True,
+        "component": "doctor_card",
+        "input": {
+            "doctors": doctor_entries,
+            "doctor_details": doctor_details
         }
     }
+    if meta:
+        resp["_meta"] = meta
+    return resp
 
 
 

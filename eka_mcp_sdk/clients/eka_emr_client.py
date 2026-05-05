@@ -1,3 +1,4 @@
+from eka_mcp_sdk import EkaAPIError
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
 import logging
@@ -310,8 +311,9 @@ class EkaEMRClient(BaseEMRClient):
     
     async def doctor_availability_elicitation(
         self,
-        doctor_id: str,
-        clinic_id: Optional[str] = None,
+        suggested_doctor_ids: Optional[List[str]] = None,
+        doctor_id: Optional[str] = None,
+        hospital_id: Optional[str] = None,
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
         supports_elicitation: bool = True,
@@ -334,54 +336,87 @@ class EkaEMRClient(BaseEMRClient):
             - slot_confirmed: False if elicitation is needed (user must select)
         """
         try:
+            if not suggested_doctor_ids and not doctor_id:
+                raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
             if meta:
                 meta = dict(meta)
             else:
                 meta = {}
-            selected_date = preferred_date
-            selected_slot = preferred_slot_time
-            # 1. Fetch doctor profile
-            doctor_profile = await self.get_doctor_profile(doctor_id)
-            if not doctor_profile or not doctor_profile.get('id'):
-                return {"error": f"Doctor with ID '{doctor_id}' not found"}
+            
+            doctor_entries = []
+            doctor_details = dict()
+            is_doctor_selected = False
+            is_date_slot_available = False
 
-            entities_response = await self.get_business_entities()
-            all_clinics_list = entities_response.get('clinics', [])
+            if doctor_id:   # single doctor is selected -> old flow
+                is_doctor_selected = True
+                selected_date = preferred_date
+                selected_slot = preferred_slot_time
+                # Fetch doctor profile
+                doctor_profile = await self.get_doctor_profile(doctor_id)
+                if not doctor_profile or not doctor_profile.get('id'):
+                    return {"error": f"Doctor with ID '{doctor_id}' not found"}
 
-            doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
-            doctor_details = build_doctor_details(doctor_profile, doctor_clinics)
+                entities_response = await self.get_business_entities()
+                all_clinics_list = entities_response.get('clinics', [])
 
-            resolved_clinic_id = resolve_hospital_id(doctor_clinics, clinic_id) or clinic_id
+                doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
+                selected_doctor_details = build_doctor_details(doctor_profile, doctor_clinics)
 
-            doctor_entry = {
-                "doctor_id": doctor_id,
-                "hospital_id": resolved_clinic_id,
-                "preferred_date": selected_date,
-                "availability": [],
-            }
+                resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
 
-            availability_list, new_preferred_date = await self._fetch_doctor_availability(
-                doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
-            )
-            if availability_list:
-                doctor_entry["availability"] = availability_list
-            if new_preferred_date:
-                doctor_entry["preferred_date"] = new_preferred_date
+                doctor_entry = {
+                    "doctor_id": doctor_id,
+                    "hospital_id": resolved_clinic_id,
+                    "preferred_date": selected_date,
+                    "availability": [],
+                }
 
-            # User has already selected a slot
-            if selected_date and selected_slot:
-                slot_confirmed = self._is_slot_available(
-                    availability_list, selected_date, selected_slot
+                availability_list, new_preferred_date = await self._fetch_doctor_availability(
+                    doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
                 )
-                # if the slot user has selected is available, return success response, else continue with elicitation
-                if slot_confirmed:
-                    return build_elicitation_success_response(doctor_id, doctor_details, selected_date, selected_slot, resolved_clinic_id)
+                if availability_list:
+                    doctor_entry["availability"] = availability_list
+                    is_date_slot_available = True
+                if new_preferred_date:
+                    doctor_entry["preferred_date"] = new_preferred_date
 
-            # 8. Build response based on client capability
+                # User has already selected a slot
+                if selected_date and selected_slot:
+                    slot_confirmed = self._is_slot_available(
+                        availability_list, selected_date, selected_slot
+                    )
+                    # if the slot user has selected is available, return success response, else continue with elicitation
+                    if slot_confirmed:
+                        return build_elicitation_success_response(doctor_id, selected_doctor_details, selected_date, selected_slot, resolved_clinic_id)
+                
+                doctor_entries.append(doctor_entry)
+                doctor_details[doctor_id] = selected_doctor_details
+
+            elif suggested_doctor_ids:       # doctor not selected but multiple suggestions
+                for suggested_doctor_id in suggested_doctor_ids:
+                    suggested_doctor_profile = await self.get_doctor_profile(suggested_doctor_id)
+                    entities_response = await self.get_business_entities()
+                    all_clinics_list = entities_response.get('clinics', [])
+
+                    doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
+                    suggested_doctor_details = build_doctor_details(suggested_doctor_profile, doctor_clinics)
+
+                    doctor_entry = {
+                        "doctor_id": suggested_doctor_id,
+                        "availability": [],
+                    }
+                    doctor_entries.append(doctor_entry)
+                    doctor_details[suggested_doctor_id] = suggested_doctor_details
+            
+            else:   # neither doctor_id nor suggested_doctor_ids are provided -> unexpected behaviour
+                raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
+
+            # Build response based on client capability
             if supports_elicitation:
-                response = build_elicitation_response(doctor_id, doctor_entry, doctor_details)
+                response = build_elicitation_response(doctor_entries, doctor_details, is_doctor_selected, is_date_slot_available)
             else:
-                response = build_plain_availability_response(doctor_id, doctor_entry, doctor_details)
+                response = build_plain_availability_response(doctor_entries, doctor_details, is_doctor_selected)
             return response
 
         except Exception as e:
@@ -864,10 +899,6 @@ class EkaEMRClient(BaseEMRClient):
         )
     
     # Abstract method implementations (Not implemented for this client)
-    async def doctor_discovery(self, *args, **kwargs) -> Dict[str, Any]:
-        """Not implemented for EkaEMRClient."""
-        return {"error": "Not implemented", "message": "doctor_discovery is not available for this workspace"}
-    
     async def get_appointments(self, *args, **kwargs) -> Dict[str, Any]:
         """Not implemented for EkaEMRClient."""
         return {"error": "Not implemented", "message": "get_appointments is not available for this workspace"}
