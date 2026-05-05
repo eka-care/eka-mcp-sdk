@@ -112,12 +112,15 @@ def build_elicitation_response(
     doctor_entries: Dict[str, Any],
     doctor_details: Dict[str, Any],
     is_doctor_selected: bool,
-    is_date_slot_available: bool
+    is_date_slot_available: bool,
+    doctor_id: Optional[str] = None,
+    hospital_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Build the UI contract response for doctor availability elicitation.
     """
     status = "success"
+    tool_result = None
     if not is_date_slot_available:
         status = "progress"
         meta = {
@@ -149,7 +152,11 @@ def build_elicitation_response(
         }
     else:
         meta = None
-    
+        tool_result = {}
+        if doctor_id:
+            tool_result["selected_doctor_id"] = doctor_id
+        if hospital_id:
+            tool_result["selected_hospital_id"] = hospital_id
 
     resp = {
         "status": status,
@@ -162,6 +169,11 @@ def build_elicitation_response(
     }
     if meta:
         resp["_meta"] = meta
+    if tool_result:
+        if resp.get("_meta"):
+            resp["_meta"]["tool_result"] = tool_result
+        else:
+            resp["_meta"] = {"tool_result": tool_result}
     return resp
 
 
