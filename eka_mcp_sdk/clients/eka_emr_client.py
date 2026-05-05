@@ -414,7 +414,7 @@ class EkaEMRClient(BaseEMRClient):
 
             # Build response based on client capability
             if supports_elicitation:
-                response = build_elicitation_response(doctor_entries, doctor_details, is_doctor_selected, is_date_slot_available)
+                response = build_elicitation_response(doctor_entries, doctor_details, is_doctor_selected, is_date_slot_available, doctor_id, hospital_id)
             else:
                 response = build_plain_availability_response(doctor_entries, doctor_details, is_doctor_selected)
             return response
