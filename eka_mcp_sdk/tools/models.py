@@ -120,3 +120,53 @@ class RescheduleAppointmentRequest(BaseModel):
         description="New end time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
         pattern=TIME_24H_PATTERN,
     )
+
+
+class ServiceBookingRequest(BaseModel):
+    service_id: str = Field(
+        ...,
+        description="Service/Package's unique identifier",
+    )
+    hospital_id: str = Field(
+        ...,
+        description="Hospital/facility/clinic's unique identifier",
+    )
+    date: str = Field(
+        ...,
+        description="service/package booking date in YYYY-MM-DD format (today or future)",
+        pattern=DATE_PATTERN,
+    )
+    slot_id: int = Field(
+        ...,
+        description="Package's slot identifier from package lookup",
+    )
+    slot_time: str = Field(
+        ...,
+        description="Package's slot time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
+    )
+    patient_first_name: str = Field(
+        ...,
+        description="Patient's first name",
+    )
+    patient_last_name: str = Field(
+        ...,
+        description="Patient's last name",
+    )
+    mobile: str = Field(
+        ...,
+        description="Patient's mobile number with country code (+91...)",
+    )
+    gender: str = Field(
+        ...,
+        description="Patient's gender (Male or Female or Other)",
+        pattern=r"^(Male|Female|Other)$",
+    )
+    patient_dob: str = Field(
+        ...,
+        description="Patient's date of birth (YYYY-MM-DD)",
+        pattern=DATE_PATTERN,
+    )
+    patient_uhid: Optional[str] = Field(
+        None,
+        description="Patient's unique health identifier (optional)",
+    )

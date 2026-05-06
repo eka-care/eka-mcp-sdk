@@ -569,3 +569,83 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 "status_code": e.status_code,
                 "error_code": e.error_code
             }
+
+
+    @mcp.tool(
+        tags={"health", "package", "availability", "elicitation"},
+        annotations=readonly_tool_annotations()
+    )
+
+    async def service_availability_elicitation(
+        suggested_service_ids: Annotated[Optional[List[str]], "List of suggested service ids"] = None,
+        service_id: Annotated[Optional[str], "Selected service id from suggested_service_ids"] = None,
+        hospital_id: Annotated[Optional[str], "Hospital/Clinic/Facility identifier"] = None,
+        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format"] = None,
+        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Interactive service availability and selection tool. Provides a UI for users to discover services, view availability, and pick a date/slot in one flow. Prefer this over listing service options in other ways like plain text or pills.
+
+        Typical use cases (guidance, not strict rules):
+        - Service booking intent or rescheduling flows
+        - When service availability or service details need to be discovered or displayed to the user
+        - After search_service_tool returns matches and the user needs to choose one
+        - When a specific service is already in context and the user wants to see slots
+
+        Parameters — pass exactly ONE of `suggested_service_ids` OR `service_id`:
+        - suggested_service_ids (list[str]): multiple candidate service IDs to present to the user
+        - service_id (str): a single service ID when one is already selected
+        - hospital_id (str, optional): include only when known
+        - preferred_date (str, optional): YYYY-MM-DD, only if user stated a date
+        - preferred_slot_time (str, optional): HH:MM, only if user stated a time
+
+        Sourcing IDs (important — do not hallucinate):
+        All IDs (service_id, suggested_service_ids, hospital_id) must come from one of:
+        – a prior search_service_tool result in this conversation
+        – a prior result of this tool
+        – explicit conversation context where the ID was provided
+        If no such ID is available, call search_service_tool first instead of guessing.
+
+        Constraints:
+        - Do not pass both suggested_service_ids and service_id
+        - Do not call with both empty
+        - Do not fabricate IDs, dates, or times not grounded in the conversation
+
+        Returns: Interactive selector showing available dates and time slots.
+        """
+        meta = ctx.request_context.meta
+        await ctx.info(f"[service_availability_elicitation] suggested_service_ids: {suggested_service_ids}, service_id: {service_id}, hospital_id: {hospital_id}, date: {preferred_date}, slot: {preferred_slot_time}, meta: {meta}")
+        
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            doctor_clinic_service = DoctorClinicService(client)
+            
+            # Delegate to client - all orchestration logic is in the client layer
+            result = await doctor_clinic_service.service_availability_elicitation(
+                suggested_service_ids=suggested_service_ids,
+                service_id=service_id,
+                hospital_id=hospital_id,
+                preferred_date=preferred_date,
+                preferred_slot_time=preferred_slot_time,
+                supports_elicitation=get_supports_elicitation(),
+                meta=meta
+            )
+            
+            await ctx.info("[service_availability_elicitation] Completed\n")
+            
+            return result
+            
+        except EkaAPIError as e:
+            await ctx.error(f"[service_availability_elicitation] Failed: {e.message}\n")
+            return {
+                "error": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
+            }

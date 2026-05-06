@@ -70,51 +70,61 @@ def parse_slots_to_date_map(
     return date_slots_map
 
 def build_elicitation_success_response(
-    doctor_id,
-    doctor_details,
+    entity_id,
+    entity_details,
     selected_date,
     selected_slot,
-    clinic_id
+    clinic_id,
+    selected_slot_id=None,
+    entity_type="doctor"
 ):
     res = {
         "component": "success",
         "is_elicitation": True,
         "input": {},
         "_meta": {
-            "disp_message": "I want to book an appointment at %s on %s with %s.",
-            "disp_toast_msg": "Selected %s slot on %s with %s",
+            "disp_message": "I would like to schedule a booking on %s at %s for %s",
+            "disp_toast_msg": "Selected %s slot on %s for %s",
             "tool_result": {}
         },
         "status": "success"
     }
-    doctor_name = doctor_details.get("name") or ""
-    if not doctor_name.lower().startswith("dr."):
-        doctor_name = "Dr. " + doctor_name
-    res["_meta"]["disp_toast_msg"] = res["_meta"]["disp_toast_msg"] % (selected_slot, selected_date, doctor_name)
-    res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (selected_slot, selected_date, doctor_name)
+    entity_name = entity_details.get("name") or ""
+    if entity_type == "doctor":
+        if not entity_name.lower().startswith("dr."):
+            entity_name = "Dr. " + entity_name
+    res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (selected_date, selected_slot, entity_name)
+    res["_meta"]["disp_toast_msg"] = res["_meta"]["disp_toast_msg"] % (selected_slot, selected_date, entity_name)
     selected_hospital = None
-    for h in doctor_details.get("hospitals"):
+    for h in entity_details.get("hospitals"):
         if (h.get("hospital_id") or h.get("location_id") or "") == clinic_id:
             selected_hospital = h
             break
-    doctor_name = doctor_details.get("name")
+    entity_name = entity_details.get("name")
     res["_meta"]["tool_result"] = {
-        "selected_doctor_name":doctor_name,
-        "selected_doctor_id":doctor_id,
         "selected_hospital_details": selected_hospital,
         "selected_slot":selected_slot,
         "selected_date":selected_date,
         "result": "This date and slot is available for booking. No further elicitation needed.",
     }
+    if entity_type == "doctor":
+        res["_meta"]["tool_result"]["selected_doctor_name"] = entity_name
+        res["_meta"]["tool_result"]["selected_doctor_id"] = entity_id
+    elif entity_type == "service":
+        res["_meta"]["tool_result"]["selected_service_name"] = entity_name
+        res["_meta"]["tool_result"]["selected_service_id"] = entity_id
+    if selected_slot_id:
+        res["_meta"]["tool_result"]["selected_slot_id"] = selected_slot_id
     return res
 
 def build_elicitation_response(
-    doctor_entries: Dict[str, Any],
-    doctor_details: Dict[str, Any],
-    is_doctor_selected: bool,
+    entity_entries: List[Any],
+    entity_details: Dict[str, Any],
+    is_entity_selected: bool,
     is_date_slot_available: bool,
-    doctor_id: Optional[str] = None,
-    hospital_id: Optional[str] = None
+    entity_id: Optional[str] = None,
+    hospital_id: Optional[str] = None,
+    entity_type: Optional[str] = "doctor"
 ) -> Dict[str, Any]:
     """
     Build the UI contract response for doctor availability elicitation.
@@ -136,25 +146,36 @@ def build_elicitation_response(
                         "type": "string",
                         "description": "Preferred slot time",
                     },
-                    "doctor_id": {
-                        "type": "string",
-                        "description": "Doctor's identifier",
-                    },
                     "hospital_id": {
                         "type": "string",
                         "description": "Hospital's identifier",
                     }
                 },
                 "required": [
-                    "doctor_id", "hospital_id", "preferred_date", "preferred_slot_time",
+                    "hospital_id", "preferred_date", "preferred_slot_time",
                 ]
             }
         }
+        if entity_type == "doctor":
+            meta["schema"]["properties"]["doctor_id"] = {
+                "type": "string",
+                "description": "Doctor's identifier",
+            }
+            meta["schema"]["required"].append("doctor_id")
+        elif entity_type == "service":
+            meta["schema"]["properties"]["service_id"] = {
+                "type": "string",
+                "description": "Service's identifier",
+            }
+            meta["schema"]["required"].append("service_id")
     else:
         meta = None
         tool_result = {}
-        if doctor_id:
-            tool_result["selected_doctor_id"] = doctor_id
+        if entity_id:
+            if entity_type == "doctor":
+                tool_result["selected_doctor_id"] = entity_id
+            elif entity_type == "service":
+                tool_result["selected_service_id"] = entity_id
         if hospital_id:
             tool_result["selected_hospital_id"] = hospital_id
 
@@ -163,8 +184,8 @@ def build_elicitation_response(
         "is_elicitation": True,
         "component": "doctor_card",
         "input": {
-            "doctors": doctor_entries,
-            "doctor_details": doctor_details
+            "doctors": entity_entries,
+            "doctor_details": entity_details
         }
     }
     if meta:
