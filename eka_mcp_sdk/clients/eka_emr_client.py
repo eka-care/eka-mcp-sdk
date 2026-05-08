@@ -361,7 +361,7 @@ class EkaEMRClient(BaseEMRClient):
                 all_clinics_list = entities_response.get('clinics', [])
 
                 doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
-                selected_doctor_details = build_doctor_details(doctor_profile, doctor_clinics)
+                selected_doctor_details = build_doctor_details(doctor_profile, doctor_clinics, hospital_id)
 
                 resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
 
