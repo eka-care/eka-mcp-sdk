@@ -395,19 +395,23 @@ class EkaEMRClient(BaseEMRClient):
 
             elif suggested_doctor_ids:       # doctor not selected but multiple suggestions
                 for suggested_doctor_id in suggested_doctor_ids:
-                    suggested_doctor_profile = await self.get_doctor_profile(suggested_doctor_id)
-                    entities_response = await self.get_business_entities()
-                    all_clinics_list = entities_response.get('clinics', [])
+                    try:
+                        suggested_doctor_profile = await self.get_doctor_profile(suggested_doctor_id)
+                        entities_response = await self.get_business_entities()
+                        all_clinics_list = entities_response.get('clinics', [])
 
-                    doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
-                    suggested_doctor_details = build_doctor_details(suggested_doctor_profile, doctor_clinics)
+                        doctor_clinics = find_doctor_clinics(all_clinics_list, suggested_doctor_id)
+                        suggested_doctor_details = build_doctor_details(suggested_doctor_profile, doctor_clinics)
 
-                    doctor_entry = {
-                        "doctor_id": suggested_doctor_id,
-                        "availability": [],
-                    }
-                    doctor_entries.append(doctor_entry)
-                    doctor_details[suggested_doctor_id] = suggested_doctor_details
+                        doctor_entry = {
+                            "doctor_id": suggested_doctor_id,
+                            "availability": [],
+                        }
+                        doctor_entries.append(doctor_entry)
+                        doctor_details[suggested_doctor_id] = suggested_doctor_details
+                    except Exception as e:
+                        logger.warning(f"Could not fetch availability for doctor {suggested_doctor_id}: {str(e)}")
+                        continue
             
             else:   # neither doctor_id nor suggested_doctor_ids are provided -> unexpected behaviour
                 raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
