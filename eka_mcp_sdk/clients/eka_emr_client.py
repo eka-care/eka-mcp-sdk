@@ -346,7 +346,7 @@ class EkaEMRClient(BaseEMRClient):
             doctor_entries = []
             doctor_details = dict()
             is_doctor_selected = False
-            is_date_slot_available = False
+            # is_date_slot_available = False
 
             if doctor_id:   # single doctor is selected -> old flow
                 is_doctor_selected = True
@@ -377,7 +377,7 @@ class EkaEMRClient(BaseEMRClient):
                 )
                 if availability_list:
                     doctor_entry["availability"] = availability_list
-                    is_date_slot_available = True
+                    # is_date_slot_available = True
                 if new_preferred_date:
                     doctor_entry["preferred_date"] = new_preferred_date
 
@@ -418,7 +418,7 @@ class EkaEMRClient(BaseEMRClient):
 
             # Build response based on client capability
             if supports_elicitation:
-                response = build_elicitation_response(doctor_entries, doctor_details, is_doctor_selected, is_date_slot_available, doctor_id, hospital_id)
+                response = build_elicitation_response(doctor_entries, doctor_details, is_doctor_selected, doctor_id, hospital_id)
             else:
                 response = build_plain_availability_response(doctor_entries, doctor_details, is_doctor_selected)
             return response

@@ -79,7 +79,7 @@ def build_elicitation_success_response(
     entity_type="doctor"
 ):
     res = {
-        "component": "success",
+        "component": "doctor_card",
         "is_elicitation": True,
         "input": {},
         "_meta": {
@@ -121,7 +121,6 @@ def build_elicitation_response(
     entity_entries: List[Any],
     entity_details: Dict[str, Any],
     is_entity_selected: bool,
-    is_date_slot_available: bool,
     entity_id: Optional[str] = None,
     hospital_id: Optional[str] = None,
     entity_type: Optional[str] = "doctor"
@@ -129,56 +128,42 @@ def build_elicitation_response(
     """
     Build the UI contract response for doctor availability elicitation.
     """
-    status = "success"
-    tool_result = None
-    if not is_date_slot_available:
-        status = "progress"
-        meta = {
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "preferred_date": {
-                        "type": "string",
-                        "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$",
-                        "description": "Enter the date to get slots for."
-                    },
-                    "preferred_slot_time": {
-                        "type": "string",
-                        "description": "Preferred slot time",
-                    },
-                    "hospital_id": {
-                        "type": "string",
-                        "description": "Hospital's identifier",
-                    }
+    status = "progress"
+    meta = {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "preferred_date": {
+                    "type": "string",
+                    "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$",
+                    "description": "Enter the date to get slots for."
                 },
-                "required": [
-                    "hospital_id", "preferred_date", "preferred_slot_time",
-                ]
-            }
+                "preferred_slot_time": {
+                    "type": "string",
+                    "description": "Preferred slot time",
+                },
+                "hospital_id": {
+                    "type": "string",
+                    "description": "Hospital's identifier",
+                }
+            },
+            "required": [
+                "hospital_id", "preferred_date", "preferred_slot_time",
+            ]
         }
-        if entity_type == "doctor":
-            meta["schema"]["properties"]["doctor_id"] = {
-                "type": "string",
-                "description": "Doctor's identifier",
-            }
-            meta["schema"]["required"].append("doctor_id")
-        elif entity_type == "service":
-            meta["schema"]["properties"]["service_id"] = {
-                "type": "string",
-                "description": "Service's identifier",
-            }
-            meta["schema"]["required"].append("service_id")
-    else:
-        meta = None
-        tool_result = {}
-        if entity_id:
-            if entity_type == "doctor":
-                tool_result["selected_doctor_id"] = entity_id
-            elif entity_type == "service":
-                tool_result["selected_service_id"] = entity_id
-        if hospital_id:
-            tool_result["selected_hospital_id"] = hospital_id
-
+    }
+    if entity_type == "doctor":
+        meta["schema"]["properties"]["doctor_id"] = {
+            "type": "string",
+            "description": "Doctor's identifier",
+        }
+        meta["schema"]["required"].append("doctor_id")
+    elif entity_type == "service":
+        meta["schema"]["properties"]["service_id"] = {
+            "type": "string",
+            "description": "Service's identifier",
+        }
+        meta["schema"]["required"].append("service_id")
     resp = {
         "status": status,
         "is_elicitation": True,
@@ -190,11 +175,6 @@ def build_elicitation_response(
     }
     if meta:
         resp["_meta"] = meta
-    if tool_result:
-        if resp.get("_meta"):
-            resp["_meta"]["tool_result"] = tool_result
-        else:
-            resp["_meta"] = {"tool_result": tool_result}
     return resp
 
 
