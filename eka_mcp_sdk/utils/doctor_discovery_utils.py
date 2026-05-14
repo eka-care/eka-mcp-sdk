@@ -237,7 +237,8 @@ def _extract_clinic_address(clinic: Dict[str, Any]) -> Dict[str, str]:
 
 def build_doctor_details(
     doctor_profile: Dict[str, Any],
-    doctor_clinics: List[Dict[str, Any]]
+    doctor_clinics: List[Dict[str, Any]],
+    hospital_id: str = ""
 ) -> Dict[str, Any]:
     """
     Build doctor details in UI contract format.
@@ -259,17 +260,29 @@ def build_doctor_details(
     # Use doctor_clinics from business entities, fallback to profile clinics
     clinics_to_use = doctor_clinics if doctor_clinics else doctor_profile.get('clinics', [])
     
-    hospitals = []
+    selected_hospital = []
+    non_selected_hospitals = []
     for c in clinics_to_use:
         addr = _extract_clinic_address(c)
-        hospitals.append({
-            "hospital_id": c.get('clinic_id') or c.get('id', ''),
-            "name": c.get('name', ''),
-            "city": addr['city'],
-            "state": addr['state'],
-            "region_id": c.get('region_id', '')
-        })
+        current_hospital_id = c.get('clinic_id') or c.get('id', '')
+        if current_hospital_id == hospital_id:
+            selected_hospital.append({
+                "hospital_id": current_hospital_id,
+                "name": c.get('name', ''),
+                "city": addr['city'],
+                "state": addr['state'],
+                "region_id": c.get('region_id', '')
+            })
+        else:
+            non_selected_hospitals.append({
+                "hospital_id": current_hospital_id,
+                "name": c.get('name', ''),
+                "city": addr['city'],
+                "state": addr['state'],
+                "region_id": c.get('region_id', '')
+            })
     
+    hospitals = selected_hospital + non_selected_hospitals  # to show selected hospital first
     specialties = doctor_profile.get('specialties', [])
     specialty = ", ".join(
         s.get('name', '') if isinstance(s, dict) else s for s in specialties
