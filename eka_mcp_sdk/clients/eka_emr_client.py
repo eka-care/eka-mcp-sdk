@@ -213,6 +213,13 @@ class EkaEMRClient(BaseEMRClient):
             method="GET",
             endpoint=f"/dr/v1/doctor/service/{doctor_id}"
         )
+
+    async def create_crm_lead(
+        self,
+        lead_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Create a CRM lead."""
+        return {"error": "Not implemented", "message": "CRM lead creation is not available for this workspace"}
     
     # Appointment Slot APIs
     async def get_appointment_slots_raw(

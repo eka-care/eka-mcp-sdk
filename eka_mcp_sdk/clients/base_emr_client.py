@@ -104,6 +104,13 @@ class BaseEMRClient(BaseEkaClient):
         """Get Doctor services."""
         pass
 
+    # ==================== CRM Operations ====================
+
+    @abstractmethod
+    async def create_crm_lead(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a CRM lead."""
+        pass
+
     # ==================== Appointment Operations ====================
     
     @abstractmethod
