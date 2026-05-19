@@ -40,6 +40,7 @@ from .patient_service import PatientService
 from .appointment_service import AppointmentService
 from .prescription_service import PrescriptionService
 from .doctor_clinic_service import DoctorClinicService
+from .extra_service import ExtraService
 
 __all__ = [
     # Foundational components
@@ -54,5 +55,6 @@ __all__ = [
     "PatientService",
     "AppointmentService",
     "PrescriptionService",
-    "DoctorClinicService"
+    "DoctorClinicService",
+    "ExtraService"
 ]

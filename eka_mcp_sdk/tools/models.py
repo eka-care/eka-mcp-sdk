@@ -170,3 +170,16 @@ class ServiceBookingRequest(BaseModel):
         None,
         description="Patient's unique health identifier (optional)",
     )
+
+
+class GeneratePatientLead(BaseModel):
+    patient_first_name: str = Field(..., description="Patient First Name")
+    patient_last_name: str = Field(..., description="Patient Last Name")
+    patient_passport_number: str = Field(..., description="Patient Passport Number")
+    patient_country_name: str = Field(..., description="Patient Country Name")
+    patient_mobile_number: str = Field(..., description="Patient whatsapp mobile number WITHOUT country code. Only digits.")
+    mobile_country_code: str = Field(..., description="Patient mobile country code WITH + prefix. e.g. '+91'")
+    patient_email_address: str = Field(..., description="Patient Email Address")
+    city_id: int = Field(..., description="Preferred City ID")
+    hospital_id: int = Field(..., description="Preferred Hospital ID")
+    specialty: str = Field(..., description="Specialty / Treatment Required")
