@@ -705,12 +705,13 @@ class EkaEMRClient(BaseEMRClient):
             params["doctor_id"] = doctor_id
         if clinic_id:
             params["clinic_id"] = clinic_id
-        if patient_id:
-            params["patient_id"] = patient_id
         if start_date:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if patient_id:
+            params = {"patient_id": patient_id} # API constraint: patient_id cannot be combined with other filters
+
             
         return await self._make_request(
             method="GET",
