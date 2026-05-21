@@ -620,7 +620,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
-        enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
     )
