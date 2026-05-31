@@ -175,11 +175,30 @@ class ServiceBookingRequest(BaseModel):
 class GeneratePatientLead(BaseModel):
     patient_first_name: str = Field(..., description="Patient First Name")
     patient_last_name: str = Field(..., description="Patient Last Name")
-    patient_passport_number: str = Field(..., description="Patient Passport Number")
-    patient_country_name: str = Field(..., description="Patient Country Name")
-    patient_mobile_number: str = Field(..., description="Patient whatsapp mobile number WITHOUT country code. Only digits.")
-    mobile_country_code: str = Field(..., description="Patient mobile country code WITH + prefix. e.g. '+91'")
-    patient_email_address: str = Field(..., description="Patient Email Address")
-    city_id: int = Field(..., description="Preferred City ID")
-    hospital_id: int = Field(..., description="Preferred Hospital ID")
-    specialty: str = Field(..., description="Specialty / Treatment Required")
+    patient_mobile_number: Optional[str] = Field(
+        ...,
+        description="Patient whatsapp mobile number WITHOUT country code. Only digits.",
+    )
+    mobile_country_code: str = Field(
+        ...,
+        description="Patient mobile country code WITH + prefix. e.g. '+91'",
+    )
+    patient_passport_number: Optional[str] = Field(
+        None, description="Patient Passport Number"
+    )
+    patient_country_name: Optional[str] = Field(
+        None, description="Patient Country Name"
+    )
+    patient_email_address: Optional[str] = Field(
+        None, description="Patient Email Address"
+    )
+    city_name: Optional[str] = Field(None, description="Preferred City Name")
+    city_id: Optional[int] = Field(None, description="Preferred City ID")
+    hospital_id: Optional[int] = Field(None, description="Preferred Hospital ID")
+    specialty: Optional[str] = Field(
+        None, description="Specialty / Treatment Required"
+    )
+    doctor_name: Optional[str] = Field(None, description="Doctor Name")
+    doctor_phone_number: Optional[str] = Field(
+        None, description="Doctor Phone Number"
+    )

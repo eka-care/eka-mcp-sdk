@@ -40,7 +40,9 @@ def register_extra_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             extra_service = ExtraService(client)
-            result = await extra_service.create_crm_lead(lead_data.model_dump())
+            result = await extra_service.create_crm_lead(
+                lead_data.model_dump(exclude_none=True)
+            )
 
             await ctx.info("[create_crm_lead_tool] Completed successfully\n")
             return {"success": True, "data": result}
