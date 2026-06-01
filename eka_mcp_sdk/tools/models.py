@@ -175,7 +175,7 @@ class ServiceBookingRequest(BaseModel):
 class GeneratePatientLead(BaseModel):
     patient_first_name: str = Field(..., description="Patient First Name")
     patient_last_name: str = Field(..., description="Patient Last Name")
-    patient_mobile_number: Optional[str] = Field(
+    patient_mobile_number: str = Field(
         ...,
         description="Patient whatsapp mobile number WITHOUT country code. Only digits.",
     )
