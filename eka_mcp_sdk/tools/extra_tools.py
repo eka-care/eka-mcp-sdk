@@ -40,7 +40,13 @@ def register_extra_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             extra_service = ExtraService(client)
-            result = await extra_service.create_crm_lead(lead_data.model_dump())
+            lead_data_dict = lead_data.model_dump(exclude_none=True)
+            name_parts = (lead_data_dict.get("patient_name") or "").strip().split(None, 1)
+            lead_data_dict["patient_first_name"] = name_parts[0] if name_parts else ""
+            lead_data_dict["patient_last_name"] = name_parts[1] if len(name_parts) > 1 else ""
+            result = await extra_service.create_crm_lead(
+                lead_data_dict
+            )
 
             await ctx.info("[create_crm_lead_tool] Completed successfully\n")
             return {"success": True, "data": result}
