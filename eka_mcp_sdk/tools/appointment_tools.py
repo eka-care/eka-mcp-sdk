@@ -396,6 +396,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 end_time=booking.end_time,
                 mode=booking.mode,
                 reason=booking.reason,
+                patient_name=booking.patient_name,
+                dob=booking.dob,
+                gender=booking.gender,
             )
             
             if result.get("success"):

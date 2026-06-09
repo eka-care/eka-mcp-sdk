@@ -168,7 +168,10 @@ class BaseEMRClient(BaseEkaClient):
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        patient_name: Optional[str] = None,
+        dob: Optional[str] = None,
+        gender: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
