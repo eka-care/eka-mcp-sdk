@@ -72,6 +72,20 @@ class AppointmentBookingRequest(BaseModel):
         examples=["Regular checkup", "Follow-up consultation"]
     )
     
+    patient_name: Optional[str] = Field(
+        None,
+        description="Full patient name. Used for QuickUHID registration when patient_id is absent.",
+    )
+    dob: Optional[str] = Field(
+        None,
+        description="Date of birth in YYYY-MM-DD format. Used for QuickUHID registration when patient_id is absent.",
+        pattern=DATE_PATTERN,
+    )
+    gender: Optional[str] = Field(
+        None,
+        description="Patient gender (M/Male or F/Female). Used for QuickUHID registration when patient_id is absent.",
+    )
+
     @field_validator('date')
     @classmethod
     def validate_date_not_past(cls, v: str) -> str:

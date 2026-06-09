@@ -142,7 +142,10 @@ class AppointmentService:
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        patient_name: Optional[str] = None,
+        dob: Optional[str] = None,
+        gender: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
@@ -154,7 +157,17 @@ class AppointmentService:
             - If slot unavailable: {"success": False, "slot_unavailable": True, "alternate_slots": [...]}
         """
         return await self.client.book_appointment_with_validation(
-            patient_id, doctor_id, clinic_id, date, start_time, end_time, mode, reason
+            patient_id,
+            doctor_id,
+            clinic_id,
+            date,
+            start_time,
+            end_time,
+            mode,
+            reason,
+            patient_name=patient_name,
+            dob=dob,
+            gender=gender,
         )
     
     async def doctor_availability_elicitation(
