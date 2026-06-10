@@ -37,9 +37,9 @@ class PatientData(BaseModel):
 class AppointmentBookingRequest(BaseModel):
     """Appointment booking request model matching Eka Care API specification."""
     
-    patient_id: str = Field(
-        ...,
-        description="Patient's unique identifier (oid from patient lookup)",
+    patient_id: Optional[str] = Field(
+        None,
+        description="Patient's unique identifier (oid from patient lookup). Omit for QuickUHID and provide patient_name, dob, and gender.",
     )
     doctor_id: str = Field(
         ...,
