@@ -4,6 +4,7 @@ Doctor and clinic service module containing core business logic for doctor and c
 This module provides reusable service classes that can be used both by MCP tools
 and directly by other applications like CrewAI agents.
 """
+import datetime
 from typing import Any, Dict, Optional, List
 import logging
 
@@ -130,6 +131,20 @@ class DoctorClinicService:
         """
         Return doctor availability based on the contract format
         """
+        if preferred_date is None or preferred_slot_time is None:
+            now = datetime.datetime.now()
+            today = now.date()
+
+        if preferred_date is None:
+            target_date = now + datetime.timedelta(days=1) if now.hour >= 21 else now
+            preferred_date = target_date.date().isoformat()
+
+        if preferred_slot_time is None:
+            if datetime.date.fromisoformat(preferred_date) == today:
+                preferred_slot_time = now.strftime("%H:%M")
+            else:
+                preferred_slot_time = "08:00"
+        
         _ = meta  # v2 currently does not need request meta.
         doctor_ids: List[str] = []
         if doctor_id:
