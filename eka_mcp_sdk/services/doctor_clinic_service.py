@@ -15,7 +15,13 @@ from ..utils.enrichment_helpers import (
     extract_doctor_summary,
 )
 from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id
-from .models import DayAvailability, DoctorAvailability, DoctorAvailabilityV2Response
+from typing import Union
+from .models import (
+    DayAvailability,
+    DoctorAvailability,
+    DoctorAvailabilityV2Response,
+    ConfirmedSlotResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,9 +132,14 @@ class DoctorClinicService:
         preferred_date: Optional[str] = None,
         preferred_slot_time: Optional[str] = None,
         meta: Optional[Dict[Any, Any]] = None
-    ) -> DoctorAvailabilityV2Response:
+    ) -> Union[DoctorAvailabilityV2Response, ConfirmedSlotResponse]:
         """
-        Return doctor availability based on the contract format
+        Return doctor availability based on the contract format.
+
+        For a single selected doctor whose preferred date + slot are already
+        available, this returns a ConfirmedSlotResponse carrying the raw data.
+        It intentionally does NOT build the elicitation success model; the
+        calling tool is responsible for that.
         """
         doctors_payload: List[DoctorAvailability] = []
 
@@ -138,29 +149,46 @@ class DoctorClinicService:
                 single_availability = await self.client.fetch_single_doctor_availability(
                     doctor_id, hospital_id, preferred_date, preferred_slot_time
                 )
-                doctor_availability = [
-                    DayAvailability(date=day["date"], slots=day["slots"])
-                    for day in single_availability["availability_list"]
-                ]
-                doctors_payload.append(
-                    DoctorAvailability(
-                        doctor_id=doctor_id,
-                        doctor_availability=doctor_availability,
-                    )
-                )
             except Exception as e:
                 logger.warning(
                     "Could not fetch v2 availability for doctor %s: %s",
                     doctor_id,
                     str(e),
                 )
-                doctors_payload.append(
+                return DoctorAvailabilityV2Response(
+                    doctors=[
+                        DoctorAvailability(doctor_id=doctor_id, doctor_availability=[])
+                    ]
+                )
+
+            availability_list = single_availability["availability_list"]
+
+            # User has already selected a date + slot and it is available:
+            # signal confirmation and let the tool build the elicitation model.
+            if preferred_date and preferred_slot_time and self.client._is_slot_available(
+                availability_list, preferred_date, preferred_slot_time
+            ):
+                return ConfirmedSlotResponse(
+                    slot_confirmed=True,
+                    doctor_id=doctor_id,
+                    doctor_details=single_availability["doctor_details"],
+                    clinic_id=single_availability["resolved_clinic_id"],
+                    selected_date=preferred_date,
+                    selected_slot=preferred_slot_time,
+                )
+
+            doctor_availability = [
+                DayAvailability(date=day["date"], slots=day["slots"])
+                for day in availability_list
+            ]
+            return DoctorAvailabilityV2Response(
+                doctors=[
                     DoctorAvailability(
                         doctor_id=doctor_id,
-                        doctor_availability=[],
+                        doctor_availability=doctor_availability,
                     )
-                )
-            return DoctorAvailabilityV2Response(doctors=doctors_payload)
+                ]
+            )
 
         if not suggested_doctor_ids:
             raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")

@@ -16,6 +16,7 @@ from ..utils.tool_registration import get_extra_headers, get_supports_elicitatio
 from ..services.appointment_service import AppointmentService
 from ..utils.workspace_utils import get_workspace_id
 from ..clients.client_factory import ClientFactory
+from ..utils.doctor_discovery_utils import build_elicitation_success_response
 
 logger = logging.getLogger(__name__)
 
@@ -620,13 +621,30 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                     preferred_slot_time = "08:00"
 
             #check doctor availability
-            return await doctor_clinic_service.doctor_availability_elicitation_v2(
+            doctor_availability = await doctor_clinic_service.doctor_availability_elicitation_v2(
                 suggested_doctor_ids=suggested_doctor_ids,
                 doctor_id=doctor_id,
                 hospital_id=hospital_id,
                 preferred_date=preferred_date,
                 preferred_slot_time=preferred_slot_time,
             )
+
+            # Single doctor with an already-available date + slot: build the
+            # elicitation success model here (the service only returns the data).
+            if doctor_availability.get("slot_confirmed"):
+                return build_elicitation_success_response(
+                    doctor_availability["doctor_id"],
+                    doctor_availability["doctor_details"],
+                    doctor_availability["selected_date"],
+                    doctor_availability["selected_slot"],
+                    doctor_availability["clinic_id"],
+                )
+
+            #handle clicitation
+            if supports_elicitation:
+                return doctor_availability
+            else:
+                return doctor_availability["doctors"] # to be implemented
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation_v2] Failed: {e.message}\n")
             return {
