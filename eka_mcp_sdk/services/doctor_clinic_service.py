@@ -146,18 +146,46 @@ class DoctorClinicService:
                 preferred_slot_time = "08:00"
         
         _ = meta  # v2 currently does not need request meta.
-        doctor_ids: List[str] = []
+        doctors_payload: List[DoctorAvailability] = []
+
         if doctor_id:
-            doctor_ids = [doctor_id]
-        elif suggested_doctor_ids:
-            doctor_ids = [d for d in suggested_doctor_ids if d]
-        else:
+            # single doctor is selected -> reuse the shared availability fetch
+            try:
+                single_availability = await self.client.fetch_single_doctor_availability(
+                    doctor_id, hospital_id, preferred_date, preferred_slot_time
+                )
+                doctor_availability = [
+                    DayAvailability(date=day["date"], slots=day["slots"])
+                    for day in single_availability["availability_list"]
+                ]
+                doctors_payload.append(
+                    DoctorAvailability(
+                        doctor_id=doctor_id,
+                        doctor_availability=doctor_availability,
+                    )
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not fetch v2 availability for doctor %s: %s",
+                    doctor_id,
+                    str(e),
+                )
+                doctors_payload.append(
+                    DoctorAvailability(
+                        doctor_id=doctor_id,
+                        doctor_availability=[],
+                    )
+                )
+            return DoctorAvailabilityV2Response(doctors=doctors_payload)
+
+        if not suggested_doctor_ids:
             raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
+
+        doctor_ids: List[str] = [d for d in suggested_doctor_ids if d]
 
         entities_response = await self.client.get_business_entities()
         all_clinics_list = entities_response.get("clinics", [])
 
-        doctors_payload: List[DoctorAvailability] = []
         for current_doctor_id in doctor_ids:
             try:
                 doctor_clinics = find_doctor_clinics(all_clinics_list, current_doctor_id)
