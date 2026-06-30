@@ -10,10 +10,12 @@ import logging
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
+    get_cached_data,
+    extract_patient_summary,
+    extract_doctor_summary,
 )
+from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id
+from .models import DoctorAvailabilityV2Response
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +117,66 @@ class DoctorClinicService:
             supports_elicitation=supports_elicitation,
             meta=meta
         )
+
+    async def doctor_availability_elicitation_v2(
+        self,
+        suggested_doctor_ids: Optional[List[str]] = None,
+        doctor_id: Optional[str] = None,
+        hospital_id: Optional[str] = None,
+        preferred_date: Optional[str] = None,
+        preferred_slot_time: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None
+    ) -> DoctorAvailabilityV2Response:
+        """
+        Return doctor availability in a list-oriented payload.
+        """
+        _ = meta  # v2 currently does not need request meta.
+        doctor_ids: List[str] = []
+        if doctor_id:
+            doctor_ids = [doctor_id]
+        elif suggested_doctor_ids:
+            doctor_ids = [d for d in suggested_doctor_ids if d]
+        else:
+            raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
+
+        entities_response = await self.client.get_business_entities()
+        all_clinics_list = entities_response.get("clinics", [])
+
+        doctors_payload: List[DoctorAvailabilityV2Response] = []
+        for current_doctor_id in doctor_ids:
+            try:
+                doctor_clinics = find_doctor_clinics(all_clinics_list, current_doctor_id)
+                resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
+                if not resolved_clinic_id:
+                    doctors_payload.append(
+                        {"doctor_id": current_doctor_id, "doctor_availability": []}
+                    )
+                    continue
+
+                availability_list, _ = await self.client._fetch_doctor_availability(
+                    current_doctor_id,
+                    resolved_clinic_id,
+                    preferred_date,
+                    preferred_slot_time,
+                )
+
+                doctors_payload.append(
+                    {
+                        "doctor_id": current_doctor_id,
+                        "doctor_availability": availability_list,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not fetch v2 availability for doctor %s: %s",
+                    current_doctor_id,
+                    str(e),
+                )
+                doctors_payload.append(
+                    {"doctor_id": current_doctor_id, "doctor_availability": []}
+                )
+
+        return {"doctors": doctors_payload}
 
     async def service_availability_elicitation(
         self,

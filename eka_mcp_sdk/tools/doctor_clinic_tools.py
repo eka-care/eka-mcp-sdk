@@ -541,6 +541,16 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             token: AccessToken | None = get_access_token()
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
+
+            if workspace_id == "ekaemr":
+                result = await _doctor_availability_elicitation_v2(
+                    suggested_doctor_ids=suggested_doctor_ids,
+                    doctor_id=doctor_id,
+                    hospital_id=hospital_id,
+                    preferred_date=preferred_date,
+                    preferred_slot_time=preferred_slot_time,
+                    ctx=ctx
+                )
             custom_headers = get_extra_headers()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
@@ -570,12 +580,45 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 "error_code": e.error_code
             }
 
+    async def _doctor_availability_elicitation_v2(
+        suggested_doctor_ids: Annotated[Optional[List[str]], "List of suggested doctor ids"] = None,
+        doctor_id: Annotated[Optional[str], "Selected doctor id from suggested_doctor_ids"] = None,
+        hospital_id: Annotated[Optional[str], "Hospital/Clinic/Facility identifier"] = None,
+        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format"] = None,
+        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Return doctor availability based on the platform's capabilities.
+        """
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            doctor_clinic_service = DoctorClinicService(client)
+            return await doctor_clinic_service.doctor_availability_elicitation_v2(
+                suggested_doctor_ids=suggested_doctor_ids,
+                doctor_id=doctor_id,
+                hospital_id=hospital_id,
+                preferred_date=preferred_date,
+                preferred_slot_time=preferred_slot_time,
+            )
+        except EkaAPIError as e:
+            await ctx.error(f"[doctor_availability_elicitation_v2] Failed: {e.message}\n")
+            return {
+                "error": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
+            }
 
     @mcp.tool(
         tags={"health", "package", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )
-
     async def service_availability_elicitation(
         suggested_service_ids: Annotated[Optional[List[str]], "List of suggested service ids"] = None,
         service_id: Annotated[Optional[str], "Selected service id from suggested_service_ids"] = None,
