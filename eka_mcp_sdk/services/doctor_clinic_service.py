@@ -16,7 +16,7 @@ from ..utils.enrichment_helpers import (
     extract_doctor_summary,
 )
 from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id
-from .models import DoctorAvailabilityV2Response
+from .models import DayAvailability, DoctorAvailability, DoctorAvailabilityV2Response
 
 logger = logging.getLogger(__name__)
 
@@ -157,14 +157,17 @@ class DoctorClinicService:
         entities_response = await self.client.get_business_entities()
         all_clinics_list = entities_response.get("clinics", [])
 
-        doctors_payload: List[DoctorAvailabilityV2Response] = []
+        doctors_payload: List[DoctorAvailability] = []
         for current_doctor_id in doctor_ids:
             try:
                 doctor_clinics = find_doctor_clinics(all_clinics_list, current_doctor_id)
                 resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
                 if not resolved_clinic_id:
                     doctors_payload.append(
-                        {"doctor_id": current_doctor_id, "doctor_availability": []}
+                        DoctorAvailability(
+                            doctor_id=current_doctor_id,
+                            doctor_availability=[],
+                        )
                     )
                     continue
 
@@ -175,11 +178,15 @@ class DoctorClinicService:
                     preferred_slot_time,
                 )
 
+                doctor_availability: List[DayAvailability] = [
+                    DayAvailability(date=day["date"], slots=day["slots"])
+                    for day in availability_list
+                ]
                 doctors_payload.append(
-                    {
-                        "doctor_id": current_doctor_id,
-                        "doctor_availability": availability_list,
-                    }
+                    DoctorAvailability(
+                        doctor_id=current_doctor_id,
+                        doctor_availability=doctor_availability,
+                    )
                 )
             except Exception as e:
                 logger.warning(
@@ -188,10 +195,13 @@ class DoctorClinicService:
                     str(e),
                 )
                 doctors_payload.append(
-                    {"doctor_id": current_doctor_id, "doctor_availability": []}
+                    DoctorAvailability(
+                        doctor_id=current_doctor_id,
+                        doctor_availability=[],
+                    )
                 )
 
-        return {"doctors": doctors_payload}
+        return DoctorAvailabilityV2Response(doctors=doctors_payload)
 
     async def service_availability_elicitation(
         self,

@@ -543,7 +543,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             workspace_id = get_workspace_id()
 
             if workspace_id == "ekaemr":
-                result = await _doctor_availability_elicitation_v2(
+                doctor_availability = await _doctor_availability_elicitation_v2(
                     suggested_doctor_ids=suggested_doctor_ids,
                     doctor_id=doctor_id,
                     hospital_id=hospital_id,
@@ -551,6 +551,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                     preferred_slot_time=preferred_slot_time,
                     ctx=ctx
                 )
+                return doctor_availability
             custom_headers = get_extra_headers()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
