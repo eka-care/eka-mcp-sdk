@@ -128,7 +128,7 @@ class DoctorClinicService:
         meta: Optional[Dict[Any, Any]] = None
     ) -> DoctorAvailabilityV2Response:
         """
-        Return doctor availability in a list-oriented payload.
+        Return doctor availability based on the contract format
         """
         _ = meta  # v2 currently does not need request meta.
         doctor_ids: List[str] = []
