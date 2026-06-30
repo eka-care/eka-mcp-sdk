@@ -1,3 +1,4 @@
+import datetime
 from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
@@ -597,10 +598,28 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
+            supports_elicitation = get_supports_elicitation()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             doctor_clinic_service = DoctorClinicService(client)
+            
+            #set default date and slot time if not provided
+            now = datetime.datetime.now()
+            if preferred_date is None or preferred_slot_time is None:
+                today = now.date()
+
+            if preferred_date is None:
+                target_date = now + datetime.timedelta(days=1) if now.hour >= 21 else now
+                preferred_date = target_date.date().isoformat()
+
+            if preferred_slot_time is None and not supports_elicitation:
+                if datetime.date.fromisoformat(preferred_date) == today:
+                    preferred_slot_time = now.strftime("%H:%M")
+                else:
+                    preferred_slot_time = "08:00"
+
+            #check doctor availability
             return await doctor_clinic_service.doctor_availability_elicitation_v2(
                 suggested_doctor_ids=suggested_doctor_ids,
                 doctor_id=doctor_id,
