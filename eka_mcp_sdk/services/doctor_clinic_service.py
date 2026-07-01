@@ -14,7 +14,7 @@ from ..utils.enrichment_helpers import (
     extract_patient_summary,
     extract_doctor_summary,
 )
-from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id
+from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id, build_doctor_details
 from typing import Union
 from .models import (
     DayAvailability,
@@ -157,8 +157,14 @@ class DoctorClinicService:
                 )
                 return DoctorAvailabilityV2Response(
                     doctors=[
-                        DoctorAvailability(doctor_id=doctor_id, doctor_availability=[])
-                    ]
+                        DoctorAvailability(
+                            doctor_id=doctor_id,
+                            hospital_id=hospital_id,
+                            preferred_date=preferred_date,
+                            availability=[],
+                        )
+                    ],
+                    doctor_details={},
                 )
 
             availability_list = single_availability["availability_list"]
@@ -177,17 +183,19 @@ class DoctorClinicService:
                     selected_slot=preferred_slot_time,
                 )
 
-            doctor_availability = [
-                DayAvailability(date=day["date"], slots=day["slots"])
-                for day in availability_list
-            ]
             return DoctorAvailabilityV2Response(
                 doctors=[
                     DoctorAvailability(
                         doctor_id=doctor_id,
-                        doctor_availability=doctor_availability,
+                        hospital_id=single_availability["resolved_clinic_id"],
+                        preferred_date=single_availability["preferred_date"],
+                        availability=[
+                            DayAvailability(date=day["date"], slots=day["slots"])
+                            for day in availability_list
+                        ],
                     )
-                ]
+                ],
+                doctor_details={doctor_id: single_availability["doctor_details"]},
             )
 
         if not suggested_doctor_ids:
@@ -195,6 +203,7 @@ class DoctorClinicService:
 
         doctor_ids: List[str] = [d for d in suggested_doctor_ids if d]
 
+        doctor_details: Dict[str, Any] = {}
         entities_response = await self.client.get_business_entities()
         all_clinics_list = entities_response.get("clinics", [])
 
@@ -202,30 +211,38 @@ class DoctorClinicService:
             try:
                 doctor_clinics = find_doctor_clinics(all_clinics_list, current_doctor_id)
                 resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
+                profile = await self.client.get_doctor_profile(current_doctor_id)
+                doctor_details[current_doctor_id] = build_doctor_details(
+                    profile, doctor_clinics, hospital_id or ""
+                )
+
                 if not resolved_clinic_id:
                     doctors_payload.append(
                         DoctorAvailability(
                             doctor_id=current_doctor_id,
-                            doctor_availability=[],
+                            hospital_id=hospital_id,
+                            preferred_date=preferred_date,
+                            availability=[],
                         )
                     )
                     continue
 
-                availability_list, _ = await self.client._fetch_doctor_availability(
+                availability_list, new_preferred_date = await self.client._fetch_doctor_availability(
                     current_doctor_id,
                     resolved_clinic_id,
                     preferred_date,
                     preferred_slot_time,
                 )
 
-                doctor_availability: List[DayAvailability] = [
-                    DayAvailability(date=day["date"], slots=day["slots"])
-                    for day in availability_list
-                ]
                 doctors_payload.append(
                     DoctorAvailability(
                         doctor_id=current_doctor_id,
-                        doctor_availability=doctor_availability,
+                        hospital_id=resolved_clinic_id,
+                        preferred_date=new_preferred_date or preferred_date,
+                        availability=[
+                            DayAvailability(date=day["date"], slots=day["slots"])
+                            for day in availability_list
+                        ],
                     )
                 )
             except Exception as e:
@@ -237,11 +254,16 @@ class DoctorClinicService:
                 doctors_payload.append(
                     DoctorAvailability(
                         doctor_id=current_doctor_id,
-                        doctor_availability=[],
+                        hospital_id=hospital_id,
+                        preferred_date=preferred_date,
+                        availability=[],
                     )
                 )
 
-        return DoctorAvailabilityV2Response(doctors=doctors_payload)
+        return DoctorAvailabilityV2Response(
+            doctors=doctors_payload,
+            doctor_details=doctor_details,
+        )
 
     async def service_availability_elicitation(
         self,

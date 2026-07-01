@@ -16,9 +16,51 @@ from ..utils.tool_registration import get_extra_headers, get_supports_elicitatio
 from ..services.appointment_service import AppointmentService
 from ..utils.workspace_utils import get_workspace_id
 from ..clients.client_factory import ClientFactory
-from ..utils.doctor_discovery_utils import build_elicitation_success_response
+from ..utils.doctor_discovery_utils import (
+    build_elicitation_response,
+    build_elicitation_success_response,
+    build_plain_availability_response,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _build_doctor_availability_response(
+    doctor_availability: Dict[str, Any],
+    supports_elicitation: bool,
+    doctor_id: Optional[str],
+    hospital_id: Optional[str],
+) -> Dict[str, Any]:
+    if supports_elicitation:
+        return build_elicitation_response(
+            doctor_availability["doctors"],
+            doctor_availability["doctor_details"],
+            bool(doctor_id),
+            doctor_id,
+            hospital_id,
+        )
+
+    doctors = doctor_availability["doctors"]
+    details = doctor_availability["doctor_details"]
+
+    def _to_plain(entry: Dict[str, Any]) -> Dict[str, Any]:
+        current_id = entry.get("doctor_id", "")
+        return build_plain_availability_response(
+            current_id,
+            entry,
+            details.get(current_id, {}),
+        )
+
+    if doctor_id:
+        selected_entry = next(
+            (d for d in doctors if d.get("doctor_id") == doctor_id),
+            doctors[0] if doctors else {},
+        )
+        if not selected_entry:
+            return {}
+        return _to_plain(selected_entry)
+
+    return {"doctors": [_to_plain(d) for d in doctors]}
 
 
 def register_doctor_clinic_tools(mcp: FastMCP) -> None:
@@ -640,11 +682,12 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                     doctor_availability["clinic_id"],
                 )
 
-            #handle clicitation
-            if supports_elicitation:
-                return doctor_availability
-            else:
-                return doctor_availability["doctors"] # to be implemented
+            return _build_doctor_availability_response(
+                doctor_availability,
+                supports_elicitation,
+                doctor_id,
+                hospital_id,
+            )
         except EkaAPIError as e:
             await ctx.error(f"[doctor_availability_elicitation_v2] Failed: {e.message}\n")
             return {

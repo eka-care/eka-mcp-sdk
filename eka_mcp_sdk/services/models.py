@@ -8,11 +8,14 @@ class DayAvailability(TypedDict):
 
 class DoctorAvailability(TypedDict):
     doctor_id: str
-    doctor_availability: List[DayAvailability]
+    hospital_id: Optional[str]
+    preferred_date: Optional[str]
+    availability: List[DayAvailability]
 
 
 class DoctorAvailabilityV2Response(TypedDict):
     doctors: List[DoctorAvailability]
+    doctor_details: Dict[str, Any]
 
 
 class ConfirmedSlotResponse(TypedDict):
