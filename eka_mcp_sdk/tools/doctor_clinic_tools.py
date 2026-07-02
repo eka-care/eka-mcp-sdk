@@ -553,23 +553,19 @@ def register_discovery_tools(mcp: FastMCP) -> None:
 
         Typical use cases (guidance, not strict rules):
         - Appointment booking intent or rescheduling flows
-        - When doctor availability or doctor details need to be discovered or displayed to the user
-        - After search_doctor_tool returns matches and the user needs to choose one
-        - When a specific doctor is already in context and the user wants to see slots
+        - When doctor_id is available from search_doctor result and availability or doctor details need to be discovered or displayed to the user
 
         Parameters — pass exactly ONE of `suggested_doctor_ids` OR `doctor_id`:
         - suggested_doctor_ids (list[str]): multiple candidate doctor IDs to present to the user
-        - doctor_id (str): a single doctor ID when one is already selected
+        - doctor_id (str): a single doctor ID when one is already selected/ preferred
         - hospital_id (str, optional): include only when known
         - preferred_date (str, optional): YYYY-MM-DD, only if user stated a date
         - preferred_slot_time (str, optional): HH:MM, only if user stated a time
 
         Sourcing IDs (important — do not hallucinate):
         All IDs (doctor_id, suggested_doctor_ids, hospital_id) must come from one of:
-        – a prior search_doctor_tool result in this conversation
-        – a prior result of this tool
-        – explicit conversation context where the ID was provided
-        If no such ID is available, call search_doctor_tool first instead of guessing.
+        - a prior search_doctor result in this conversation
+        - explicit conversation context where the doctor ID was provided
 
         Constraints:
         - Do not pass both suggested_doctor_ids and doctor_id
