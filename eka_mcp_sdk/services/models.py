@@ -30,3 +30,22 @@ class ConfirmedSlotResponse(TypedDict):
     clinic_id: Optional[str]
     selected_date: str
     selected_slot: str
+
+
+class PatientProfile(TypedDict):
+    """Canonical patient profile mapped from the raw minified patient API."""
+    patient_id: str
+    name: str
+    mobile: Optional[str]
+    dob: Optional[str]
+    gender: Optional[str]
+
+
+class ListPatientProfilesResponse(TypedDict):
+    """
+    Contract between PatientService.list_patient_profiles and the tool layer.
+    It carries only the canonical data; building the elicitation model is the
+    tool's responsibility.
+    """
+    profiles: List[PatientProfile]
+    page_meta: Optional[Dict[str, Any]]

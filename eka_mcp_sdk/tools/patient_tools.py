@@ -20,9 +20,67 @@ from ..clients.client_factory import ClientFactory
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.patient_service import PatientService
-from ..utils.tool_registration import get_extra_headers
+from ..utils.tool_registration import get_extra_headers, get_supports_elicitation
+from ..utils.patient_profile_utils import build_profile_elicitation_response
 
 logger = logging.getLogger(__name__)
+
+
+async def _list_patient_profiles_v2(
+    page_no: int,
+    page_size: Optional[int],
+    select: Optional[str],
+    from_timestamp: Optional[int],
+    include_archived: bool,
+    ctx: Context,
+) -> Dict[str, Any]:
+    """
+    Return patient profiles based on the platform's capabilities.
+
+    The service returns the canonical profile contract; this builds either
+    the profile-selection elicitation model or a plain profile list.
+    """
+    try:
+        token: AccessToken | None = get_access_token()
+        access_token = token.token if token else None
+        workspace_id = get_workspace_id()
+        custom_headers = get_extra_headers()
+        supports_elicitation = get_supports_elicitation()
+        client = ClientFactory.create_client(
+            workspace_id, access_token, custom_headers
+        )
+        patient_service = PatientService(client)
+
+        result = await patient_service.list_patient_profiles(
+            page_no, page_size, select, from_timestamp, include_archived
+        )
+
+        profiles = result["profiles"]
+        if not profiles:
+            await ctx.info("[list_patients] No patient profiles found\n")
+            return {
+                "success": False,
+                "error": {
+                    "message": "No patient profiles found",
+                    "error_code": "NO_PROFILES_FOUND"
+                }
+            }
+
+        await ctx.info(f"[list_patients] Completed successfully - retrieved {len(profiles)} patients\n")
+
+        if supports_elicitation:
+            return build_profile_elicitation_response(profiles, result["page_meta"])
+        return {"success": True, "data": result}
+    except EkaAPIError as e:
+        await ctx.error(f"[list_patients] Failed: {e.message}\n")
+        return {
+            "success": False,
+            "error": {
+                "message": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
+            }
+        }
 
 
 def register_patient_tools(mcp: FastMCP) -> None:
@@ -294,14 +352,22 @@ def register_patient_tools(mcp: FastMCP) -> None:
         Trigger Keywords:
         list patients, browse patient records, show all patients, view patient list
         
-        Returns: List with oid (patient_id), fln (full legal name), mobile, dob, gen (gender)
+        Returns: List of patient profiles (patient_id, name, mobile, dob, gender).
+        On clients that support elicitation this renders a profile selection UI;
+        the user's chosen patient_id comes back in a subsequent message.
         """
         await ctx.info(f"[list_patients] Listing patients - page {page_no}, size: {page_size or 'default'}")
-        
+
         try:
             token: AccessToken | None = get_access_token()
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
+
+            if workspace_id == "ekaemr":
+                return await _list_patient_profiles_v2(
+                    page_no, page_size, select, from_timestamp, include_archived, ctx
+                )
+
             custom_headers = get_extra_headers()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
