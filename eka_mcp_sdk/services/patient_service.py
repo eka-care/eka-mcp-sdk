@@ -10,13 +10,33 @@ import logging
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_doctor_summary, 
+    get_cached_data,
+    extract_doctor_summary,
     extract_clinic_summary,
     get_appointment_status_info
 )
+from .models import ListPatientProfilesResponse, PatientProfile
 
 logger = logging.getLogger(__name__)
+
+
+def map_to_patient_profiles(raw_response: Dict[str, Any]) -> List[PatientProfile]:
+    """
+    Map the raw minified patient list response to canonical profiles.
+
+    Raw shape: {"status": "success", "data": [{"oid": ..., "fln": ..., ...}]}
+    """
+    raw_patients = raw_response.get("data") if isinstance(raw_response, dict) else None
+    return [
+        PatientProfile(
+            patient_id=patient.get("oid", ""),
+            name=patient.get("fln", ""),
+            mobile=patient.get("mobile"),
+            dob=patient.get("dob"),
+            gender=patient.get("gen"),
+        )
+        for patient in raw_patients or []
+    ]
 
 
 class PatientService:
@@ -155,7 +175,33 @@ class PatientService:
         return await self.client.list_patients(
             page_no, page_size, select, from_timestamp, include_archived
         )
-    
+
+    async def list_patient_profiles(
+        self,
+        page_no: int,
+        page_size: Optional[int] = None,
+        select: Optional[str] = None,
+        from_timestamp: Optional[int] = None,
+        include_archived: bool = False
+    ) -> ListPatientProfilesResponse:
+        """
+        List patient profiles in the canonical contract format.
+
+        Same parameters as list_patients, but the raw API response is mapped
+        to PatientProfile entries (empty list if none). Building the
+        elicitation model from these is the tool's responsibility.
+
+        Raises:
+            EkaAPIError: If the API call fails
+        """
+        raw_response = await self.client.list_patients(
+            page_no, page_size, select, from_timestamp, include_archived
+        )
+        return ListPatientProfilesResponse(
+            profiles=map_to_patient_profiles(raw_response),
+            page_meta=raw_response.get("currPageMeta") if isinstance(raw_response, dict) else None,
+        )
+
     async def update_patient(
         self,
         patient_id: str,
