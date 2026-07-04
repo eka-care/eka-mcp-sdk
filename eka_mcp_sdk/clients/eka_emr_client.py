@@ -348,7 +348,9 @@ class EkaEMRClient(BaseEMRClient):
         doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
         doctor_details = build_doctor_details(doctor_profile, doctor_clinics, hospital_id)
 
-        resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
+        resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id)
+        if not resolved_clinic_id:
+            raise EkaAPIError(f"Clinic with ID '{hospital_id}' not found")
 
         availability_list, new_preferred_date = await self._fetch_doctor_availability(
             doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
