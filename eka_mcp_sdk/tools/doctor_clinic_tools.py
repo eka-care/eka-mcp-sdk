@@ -670,12 +670,28 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             # Single doctor with an already-available date + slot: build the
             # elicitation success model here (the service only returns the data).
             if doctor_availability.get("slot_confirmed"):
-                return build_elicitation_success_response(
+                if supports_elicitation:
+                    return build_elicitation_success_response(
+                        doctor_availability["doctor_id"],
+                        doctor_availability["doctor_details"],
+                        doctor_availability["selected_date"],
+                        doctor_availability["selected_slot"],
+                        doctor_availability["clinic_id"],
+                    )
+                return build_plain_availability_response(
                     doctor_availability["doctor_id"],
+                    {
+                        "hospital_id": doctor_availability["clinic_id"],
+                        "date_preference": doctor_availability["selected_date"],
+                        "slot_preference": doctor_availability["selected_slot"],
+                        "availability": [
+                            {
+                                "date": doctor_availability["selected_date"],
+                                "slots": [doctor_availability["selected_slot"]],
+                            }
+                        ],
+                    },
                     doctor_availability["doctor_details"],
-                    doctor_availability["selected_date"],
-                    doctor_availability["selected_slot"],
-                    doctor_availability["clinic_id"],
                 )
 
             return _build_doctor_availability_response(
