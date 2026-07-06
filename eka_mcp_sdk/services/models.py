@@ -49,3 +49,24 @@ class ListPatientProfilesResponse(TypedDict):
     """
     profiles: List[PatientProfile]
     page_meta: Optional[Dict[str, Any]]
+
+
+class BookedSlot(TypedDict):
+    date: str
+    start_time: str
+    end_time: str
+
+
+class AppointmentBookingV2Response(TypedDict):
+    """
+    Contract between AppointmentService.book_appointment_v2 and the tool layer.
+
+    booked=True carries the raw booking API response and the booked slot;
+    booked=False means the requested slot is unavailable and carries
+    alternatives. Hard failures (doctor not in clinic, no schedule, slot not
+    found) raise EkaAPIError instead.
+    """
+    booked: bool
+    appointment: Optional[Dict[str, Any]]
+    booked_slot: Optional[BookedSlot]
+    alternate_slots: List[Dict[str, str]]

@@ -10,11 +10,20 @@ import logging
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
+    get_cached_data,
+    extract_patient_summary,
+    extract_doctor_summary,
     extract_clinic_summary
 )
+from ..utils.doctor_discovery_utils import find_doctor_clinics
+from ..utils.book_appointment_utils import (
+    validate_clinic_schedule,
+    extract_all_slots_from_schedule,
+    check_slot_availability,
+    get_slot_end_time,
+    convert_to_timestamps,
+)
+from .models import AppointmentBookingV2Response, BookedSlot
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +178,95 @@ class AppointmentService:
             dob=dob,
             gender=gender,
         )
-    
+
+    async def book_appointment_v2(
+        self,
+        patient_id: str,
+        doctor_id: str,
+        clinic_id: str,
+        date: str,
+        start_time: str,
+        end_time: str,
+        mode: str = "INCLINIC",
+        reason: Optional[str] = None,
+    ) -> AppointmentBookingV2Response:
+        """
+        Book an appointment in the contract format.
+
+        Validates that the doctor practices at the clinic and that the
+        requested slot exists, then books it. An unavailable slot is returned
+        as booked=False with alternatives; building the outward response from
+        that is the tool's responsibility.
+
+        Raises:
+            EkaAPIError: doctor not in clinic, no schedule, slot not found,
+                or the underlying API call fails
+        """
+        entities_response = await self.client.get_business_entities()
+        doctor_clinics = find_doctor_clinics(entities_response.get("clinics", []), doctor_id)
+        doctor_clinic_ids = {c.get("clinic_id") or c.get("id") for c in doctor_clinics}
+        if clinic_id not in doctor_clinic_ids:
+            raise EkaAPIError(
+                f"Doctor '{doctor_id}' is not available at clinic '{clinic_id}'",
+                status_code=400,
+                error_code="DOCTOR_NOT_IN_CLINIC",
+            )
+
+        slots_result = await self.client.get_appointment_slots_raw(
+            doctor_id, clinic_id, f"{date}T00:00:00.000Z", f"{date}T23:59:59.000Z"
+        )
+        clinic_schedule = validate_clinic_schedule(slots_result, clinic_id)
+        if not clinic_schedule:
+            raise EkaAPIError(
+                "No appointment schedule available for this clinic",
+                status_code=404,
+                error_code="NO_SCHEDULE",
+            )
+
+        all_slots = extract_all_slots_from_schedule(clinic_schedule)
+        is_available, requested_slot, alternate_slots = check_slot_availability(
+            all_slots, date, start_time, end_time
+        )
+        if requested_slot is None:
+            raise EkaAPIError(
+                f"Time slot {start_time}-{end_time} not found in doctor's schedule",
+                status_code=404,
+                error_code="SLOT_NOT_FOUND",
+            )
+        if not is_available:
+            return AppointmentBookingV2Response(
+                booked=False,
+                appointment=None,
+                booked_slot=None,
+                alternate_slots=alternate_slots,
+            )
+
+        # Use actual slot end time from schedule (handles 15min, 30min, etc. slots)
+        actual_end_time = get_slot_end_time(requested_slot) or end_time
+        start_timestamp, end_timestamp = convert_to_timestamps(date, start_time, actual_end_time)
+
+        appointment_data: Dict[str, Any] = {
+            "clinic_id": clinic_id,
+            "doctor_id": doctor_id,
+            "patient_id": patient_id,
+            "appointment_details": {
+                "start_time": start_timestamp,
+                "end_time": end_timestamp,
+                "mode": mode,
+            },
+        }
+        if reason:
+            appointment_data["appointment_details"]["reason"] = reason
+
+        result = await self.client.book_appointment(appointment_data)
+        return AppointmentBookingV2Response(
+            booked=True,
+            appointment=result,
+            booked_slot=BookedSlot(date=date, start_time=start_time, end_time=actual_end_time),
+            alternate_slots=[],
+        )
+
+
     async def doctor_availability_elicitation(
         self,
         doctor_id: str,
