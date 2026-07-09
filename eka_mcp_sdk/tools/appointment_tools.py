@@ -22,9 +22,91 @@ from ..utils.enrichment_helpers import (
     extract_doctor_summary,
     extract_clinic_summary
 )
+from ..utils.book_appointment_utils import create_unavailable_slot_response
 from ..clients.client_factory import ClientFactory
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+_BOOKING_REQUIRED_FIELDS = ("patient_id", "doctor_id", "clinic_id", "date", "start_time", "end_time")
+
+
+async def _book_appointment_v2(
+    booking: AppointmentBookingRequest,
+    ctx: Context,
+) -> Dict[str, Any]:
+    """
+    Book an appointment for the ekaemr workspace.
+
+    Requires authorization and a complete booking request (patient_id from a
+    prior list/create patients call); the service does the validation and
+    booking and this builds the outward response.
+    """
+    try:
+        token: AccessToken | None = get_access_token()
+        access_token = token.token if token else None
+        if not access_token and not settings.client_secret:
+            return {
+                "success": False,
+                "error": {
+                    "message": "Authorization required to book an appointment",
+                    "status_code": 401,
+                    "error_code": "UNAUTHORIZED"
+                }
+            }
+
+        missing = [field for field in _BOOKING_REQUIRED_FIELDS if not getattr(booking, field)]
+        if missing:
+            return {
+                "success": False,
+                "error": {
+                    "message": f"Missing required field(s): {', '.join(missing)}",
+                    "error_code": "MISSING_REQUIRED_FIELDS"
+                }
+            }
+
+        workspace_id = get_workspace_id()
+        custom_headers = get_extra_headers()
+        client = ClientFactory.create_client(
+            workspace_id, access_token, custom_headers
+        )
+        appointment_service = AppointmentService(client)
+
+        result = await appointment_service.book_appointment_v2(
+            patient_id=booking.patient_id,
+            doctor_id=booking.doctor_id,
+            clinic_id=booking.clinic_id,
+            date=booking.date,
+            start_time=booking.start_time,
+            end_time=booking.end_time,
+            mode=booking.mode,
+            reason=booking.reason,
+        )
+
+        if not result["booked"]:
+            await ctx.info("[book_appointment] Slot unavailable, returning alternatives\n")
+            return create_unavailable_slot_response(
+                booking.date, booking.start_time, booking.end_time, result["alternate_slots"]
+            )
+
+        appointment = result["appointment"] or {}
+        appointment_id = appointment.get("appointment_id") or appointment.get("id")
+        await ctx.info(f"[book_appointment] Success - ID: {appointment_id}\n")
+        return {
+            "success": True,
+            "data": appointment,
+            "booked_slot": result["booked_slot"]
+        }
+    except EkaAPIError as e:
+        await ctx.error(f"[book_appointment] Failed: {e.message}\n")
+        return {
+            "success": False,
+            "error": {
+                "message": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
+            }
+        }
 
 
 def find_alternate_slots(
@@ -380,12 +462,19 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             token: AccessToken | None = get_access_token()
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
+
+            if workspace_id == "ekaemr":
+                result = await _book_appointment_v2(booking, ctx)
+                if result.get("success"):
+                    dedup.cache_response("book_appointment", result, **dedup_params)
+                return result
+
             custom_headers = get_extra_headers()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
-            
+
             # Delegate to client - all orchestration logic is in the client layer
             result = await appointment_service.book_appointment_with_validation(
                 patient_id=booking.patient_id,
