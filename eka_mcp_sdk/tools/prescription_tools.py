@@ -9,6 +9,7 @@ from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..services.prescription_service import PrescriptionService
 from ..utils.tool_registration import get_extra_headers
+from ..utils.fastmcp_helper import readonly_tool_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ def register_prescription_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         enabled=False,
+        tags={"prescription", "read", "details", "basic"},
+        annotations=readonly_tool_annotations()
     )
     async def get_prescription_details_basic(
         prescription_id: str,
@@ -58,7 +61,8 @@ def register_prescription_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
+        tags={"prescription", "read", "details", "comprehensive"},
+        annotations=readonly_tool_annotations()
     )
     async def get_comprehensive_prescription_details(
         prescription_id: str,
