@@ -29,6 +29,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
     """Register Patient Management MCP tools."""
     
     @mcp.tool(
+        title="Search Patients",
         enabled=True,
         annotations=readonly_tool_annotations(),
         tags={"patient", "read", "search"}
@@ -88,6 +89,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Patient Details (Basic)",
         tags={"patient", "read", "basic", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -140,6 +142,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Patient Profile (Comprehensive)",
         tags={"patient", "read", "appointments"},
         annotations=readonly_tool_annotations()
     )
@@ -195,6 +198,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Add Patient",
     tags={"patient", "write"},
     annotations=write_tool_annotations()
 )
@@ -265,6 +269,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="List Patients",
         tags={"patient", "read", "list", "browse"},
         annotations=readonly_tool_annotations()
     )
@@ -325,6 +330,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Update Patient",
         tags={"patient", "write", "update"},
         annotations=write_tool_annotations()
     )
@@ -374,6 +380,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Archive Patient",
         tags={"patient", "write", "archive", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -415,6 +422,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Find Patient by Mobile",
         tags={"patient", "read", "search", "mobile"},
         annotations=readonly_tool_annotations()
     )
@@ -465,6 +473,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Verify Mobile Number",
         tags={"patient", "auth", "otp", "verification"},
         annotations=write_tool_annotations()
     )
@@ -528,6 +537,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
 
 
     @mcp.tool(
+        title="Authenticate User",
         tags={"patient", "auth", "authentication", "authorization"},
         annotations=write_tool_annotations()
     )
@@ -567,6 +577,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="List All Patient Profiles",
         tags={"patient", "profile", "list"},
         annotations=readonly_tool_annotations()
     )
@@ -607,6 +618,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Patient Vitals",
         tags={"patient", "vitals", "health"},
         annotations=readonly_tool_annotations()
     )
@@ -651,6 +663,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Patient Benefits",
         tags={"patient", "benefits", "offers"}, annotations=readonly_tool_annotations()
     )
     async def get_patient_benefits(ctx: Context = CurrentContext()) -> Dict[str, Any]:

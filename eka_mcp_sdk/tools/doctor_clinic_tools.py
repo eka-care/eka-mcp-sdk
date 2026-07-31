@@ -23,6 +23,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     """Register Doctor and Clinic Information MCP tools."""
     
     @mcp.tool(
+        title="List Business Entities",
         tags={"doctor", "clinic", "read", "list", "primary"},
         annotations=readonly_tool_annotations()
     )
@@ -74,6 +75,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Doctor Profile (Basic)",
         tags={"doctor", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -122,6 +124,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Clinic Details (Basic)",
         tags={"clinic", "read", "profile"},
         annotations=readonly_tool_annotations()
     )
@@ -170,6 +173,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Doctor Services",
         enabled=False,
         tags={"doctor", "read", "services"},
         annotations=readonly_tool_annotations()
@@ -220,6 +224,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Doctor Profile (Comprehensive)",
         enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
@@ -279,6 +284,7 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Clinic Profile (Comprehensive)",
         enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
@@ -493,6 +499,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
     """Register Doctor Availability Elicitation MCP tools."""
     
     @mcp.tool(
+        title="Check Doctor Availability",
         tags={"doctor", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )
@@ -572,6 +579,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
 
 
     @mcp.tool(
+        title="Check Service Availability",
         tags={"health", "package", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )

@@ -18,6 +18,7 @@ def register_prescription_tools(mcp: FastMCP) -> None:
     """Register Prescription Management MCP tools."""
     
     @mcp.tool(
+        title="Prescription Details (Basic)",
         enabled=False,
         tags={"prescription", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
@@ -61,6 +62,7 @@ def register_prescription_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Prescription Details (Comprehensive)",
         tags={"prescription", "read", "details", "comprehensive"},
         annotations=readonly_tool_annotations()
     )

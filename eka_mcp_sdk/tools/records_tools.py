@@ -18,6 +18,7 @@ def register_records_tools(mcp: FastMCP) -> None:
     """Register Medical Records (vault) MCP tools."""
 
     @mcp.tool(
+        title="List Patient Records",
         tags={"records", "read", "list"},
         annotations=readonly_tool_annotations()
     )
@@ -71,6 +72,7 @@ def register_records_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Get Patient Record",
         tags={"records", "read", "details"},
         annotations=readonly_tool_annotations()
     )
@@ -120,6 +122,7 @@ def register_records_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Delete Patient Record",
         tags={"records", "write", "delete"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -169,6 +172,7 @@ def register_records_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Upload Patient Record",
         tags={"records", "write", "upload"},
         annotations=write_tool_annotations()
     )

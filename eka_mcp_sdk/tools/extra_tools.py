@@ -21,6 +21,7 @@ def register_extra_tools(mcp: FastMCP) -> None:
     """Register extra MCP tools such as CRM lead creation."""
 
     @mcp.tool(
+        title="Create CRM Lead",
         tags={"crm", "lead", "write", "create", "patient"},
         annotations=write_tool_annotations()
     )
