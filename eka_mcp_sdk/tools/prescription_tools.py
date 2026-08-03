@@ -19,7 +19,6 @@ def register_prescription_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Prescription Details (Basic)",
-        enabled=False,
         tags={"prescription", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
     )
