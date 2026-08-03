@@ -30,7 +30,6 @@ def register_patient_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Search Patients",
-        enabled=True,
         annotations=readonly_tool_annotations(),
         tags={"patient", "read", "search"}
     )
