@@ -174,7 +174,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Doctor Services",
-        enabled=False,
         tags={"doctor", "read", "services"},
         annotations=readonly_tool_annotations()
     )
@@ -225,7 +224,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Doctor Profile (Comprehensive)",
-        enabled=False,
         tags={"doctor", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )
@@ -285,7 +283,6 @@ def register_doctor_clinic_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Clinic Profile (Comprehensive)",
-        enabled=False,
         tags={"clinic", "read", "profile", "comprehensive"},
         annotations=readonly_tool_annotations()
     )

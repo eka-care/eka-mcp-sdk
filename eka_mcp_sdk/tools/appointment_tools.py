@@ -431,7 +431,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
     @mcp.tool(
         title="Show Appointments (Detailed)",
-        enabled=False,
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
     )
@@ -576,7 +575,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Appointment Details (Detailed)",
-        enabled=False,   
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
     )
@@ -631,7 +629,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         title="Appointment Details (Basic)",
-        enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -683,7 +680,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Patient Appointments (Detailed)",
-        enabled=False,
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
     )
@@ -797,7 +793,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Update Appointment",
-        enabled=False,
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
     )
@@ -959,7 +954,6 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     @mcp.tool(
         title="Reschedule Appointment",
-        enabled=True,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
     )
