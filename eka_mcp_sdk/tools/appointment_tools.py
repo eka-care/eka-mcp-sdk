@@ -109,6 +109,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
+        title="Appointment Slots",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -169,6 +170,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Available Appointment Dates",
         tags={"appointment", "read", "dates", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -265,6 +267,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Available Slots",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -328,6 +331,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Book Appointment",
         tags={"appointment", "write", "book", "create"},
         annotations=write_tool_annotations()
     )
@@ -426,6 +430,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
         
     @mcp.tool(
+        title="Show Appointments (Detailed)",
         enabled=False,
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
@@ -501,6 +506,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Show Appointments (Basic)",
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -569,6 +575,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Appointment Details (Detailed)",
         enabled=False,   
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
@@ -623,6 +630,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
+        title="Appointment Details (Basic)",
         enabled=False,
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
@@ -674,6 +682,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Patient Appointments (Detailed)",
         enabled=False,
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
@@ -733,6 +742,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Patient Appointments (Basic)",
         tags={"appointment", "read", "patient", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -786,6 +796,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Update Appointment",
         enabled=False,
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
@@ -841,6 +852,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Complete Appointment",
         tags={"appointment", "write", "complete", "status"},
         annotations=write_tool_annotations()
     )
@@ -894,6 +906,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Cancel Appointment",
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -945,6 +958,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Reschedule Appointment",
         enabled=True,
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
@@ -1000,6 +1014,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     # healtcheck Tools
     @mcp.tool(
+        title="Book Service",
         tags={"appointment", "write", "book", "create"},
         annotations=write_tool_annotations()
     )

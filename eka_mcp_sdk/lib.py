@@ -28,10 +28,11 @@ import logging
 
 from .clients.eka_emr_client import EkaEMRClient
 from .services import (
-    PatientService, 
-    AppointmentService, 
-    PrescriptionService, 
-    DoctorClinicService
+    PatientService,
+    AppointmentService,
+    PrescriptionService,
+    DoctorClinicService,
+    RecordsService
 )
 from .auth.models import EkaAPIError
 
@@ -100,6 +101,11 @@ __all__ = [
     # Sync wrapper functions - Prescriptions
     "get_prescription_details_basic_sync",
     "get_comprehensive_prescription_details_sync",
+    # Sync wrapper functions - Medical Records
+    "list_patient_records_sync",
+    "get_patient_record_sync",
+    "upload_patient_record_sync",
+    "delete_patient_record_sync",
     # Sync wrapper functions - Doctor/Clinic
     "get_business_entities_sync",
     "get_doctor_profile_basic_sync",
@@ -633,6 +639,115 @@ async def get_comprehensive_prescription_details_sync(
     service = PrescriptionService(client)
     return await service.get_comprehensive_prescription_details(
         prescription_id, include_patient_details, include_doctor_details, include_clinic_details
+    )
+
+# ============================================================================
+# MEDICAL RECORDS SERVICE SYNC WRAPPERS
+# ============================================================================
+
+@sync_wrapper
+async def list_patient_records_sync(
+    patient_id: str,
+    updated_after: Optional[int] = None,
+    offset: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    List a patient's medical records.
+
+    Args:
+        patient_id: Patient's unique identifier (oid)
+        updated_after: Only return records updated after this epoch (seconds)
+        offset: Pagination token (next_token from a previous response)
+
+    Returns:
+        Records list with items and the next pagination token
+
+    Raises:
+        EkaAPIError: If the API call fails
+    """
+    client = get_default_client()
+    service = RecordsService(client)
+    return await service.list_patient_records(patient_id, updated_after, offset)
+
+@sync_wrapper
+async def get_patient_record_sync(
+    patient_id: str,
+    document_id: str
+) -> Dict[str, Any]:
+    """
+    Get a single medical record's metadata and signed download URL.
+
+    Args:
+        patient_id: Patient's unique identifier (oid)
+        document_id: The record's unique identifier
+
+    Returns:
+        Record metadata including a signed download URL for the file
+
+    Raises:
+        EkaAPIError: If the API call fails
+    """
+    client = get_default_client()
+    service = RecordsService(client)
+    return await service.get_patient_record(patient_id, document_id)
+
+@sync_wrapper
+async def delete_patient_record_sync(
+    patient_id: str,
+    document_id: str
+) -> Dict[str, Any]:
+    """
+    Delete a patient's medical record. This is irreversible.
+
+    Args:
+        patient_id: Patient's unique identifier (oid)
+        document_id: The record's unique identifier to delete
+
+    Returns:
+        Confirmation of the deletion
+
+    Raises:
+        EkaAPIError: If the API call fails
+    """
+    client = get_default_client()
+    service = RecordsService(client)
+    return await service.delete_patient_record(patient_id, document_id)
+
+@sync_wrapper
+async def upload_patient_record_sync(
+    patient_id: str,
+    file_path: str,
+    title: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    document_type: Optional[str] = None,
+    document_date: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Upload a local file as a medical record for a patient.
+
+    Args:
+        patient_id: Patient's unique identifier (oid)
+        file_path: Absolute path to a local file to upload
+        title: Optional human-readable title
+        tags: Optional list of tags
+        document_type: Optional document type code (e.g. "lr")
+        document_date: Optional document reference date as epoch seconds
+
+    Returns:
+        Summary of the uploaded record including its document_id
+
+    Raises:
+        EkaAPIError: If the file is missing or any step of the upload fails
+    """
+    client = get_default_client()
+    service = RecordsService(client)
+    return await service.upload_patient_record(
+        patient_id=patient_id,
+        file_path=file_path,
+        title=title,
+        tags=tags,
+        document_type=document_type,
+        document_date=document_date,
     )
 
 # ============================================================================

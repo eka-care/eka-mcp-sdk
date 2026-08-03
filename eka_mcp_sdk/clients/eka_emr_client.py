@@ -912,6 +912,116 @@ class EkaEMRClient(BaseEMRClient):
             endpoint=f"/dr/v1/prescription/{prescription_id}"
         )
 
+    # Medical Records (Vault) APIs
+    async def list_medical_records(
+        self,
+        patient_id: str,
+        updated_after: Optional[int] = None,
+        offset: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """List a patient's medical records (documents).
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            updated_after: Only return records updated after this epoch (seconds)
+            offset: Pagination token (next_token from a previous response)
+        """
+        params: Dict[str, Any] = {}
+        if updated_after is not None:
+            params["u_at__gt"] = updated_after
+        if offset:
+            params["offset"] = offset
+        return await self._make_request(
+            method="GET",
+            endpoint="/mr/api/v1/docs",
+            params=params or None,
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def get_medical_record(
+        self,
+        patient_id: str,
+        document_id: str,
+    ) -> Dict[str, Any]:
+        """Get a single medical record's metadata and signed download URL.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            document_id: Unique identifier of the record/document
+        """
+        return await self._make_request(
+            method="GET",
+            endpoint=f"/mr/api/v1/docs/{document_id}",
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def delete_medical_record(
+        self,
+        patient_id: str,
+        document_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a patient's medical record (document). Irreversible.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            document_id: Unique identifier of the record/document to delete
+        """
+        return await self._make_request(
+            method="DELETE",
+            endpoint=f"/mr/api/v1/docs/{document_id}",
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def initiate_medical_record_upload(
+        self,
+        patient_id: str,
+        batch_request: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Step 1 of upload: register document metadata and obtain presigned upload URLs.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            batch_request: List of document upload requests, each containing at
+                least a ``files`` array of ``{contentType, file_size}`` entries.
+        """
+        return await self._make_request(
+            method="POST",
+            endpoint="/mr/api/v1/docs",
+            data={"batch_request": batch_request},
+            headers={"X-Pt-Id": patient_id},
+        )
+
+    async def upload_file_to_presigned_url(
+        self,
+        url: str,
+        fields: Dict[str, Any],
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> int:
+        """Step 2 of upload: POST the file bytes to the presigned storage URL.
+
+        Makes a direct multipart/form-data request (bypassing _make_request)
+        because this hits object storage (S3) directly and must NOT include the
+        eka auth headers or client-id.
+
+        Returns:
+            The HTTP status code from storage (204 on success).
+        """
+        files = {"file": (filename, file_bytes, content_type)}
+        response = await self._http_client.request(
+            method="POST",
+            url=url,
+            data=fields,
+            files=files,
+        )
+        if response.status_code >= 400:
+            raise EkaAPIError(
+                message=f"Failed to upload file to storage: {response.text[:200]}",
+                status_code=response.status_code,
+            )
+        return response.status_code
+
     # Service APIs
     async def service_availability_elicitation(
         self,

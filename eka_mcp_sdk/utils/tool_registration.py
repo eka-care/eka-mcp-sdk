@@ -209,6 +209,7 @@ def register_all_tools(mcp: FastMCP) -> None:
     from ..tools.appointment_tools import register_appointment_tools  
     from ..tools.patient_tools import register_patient_tools
     from ..tools.prescription_tools import register_prescription_tools
+    from ..tools.records_tools import register_records_tools
     
     logger.info("Registering all available tools...")
     
@@ -235,5 +236,11 @@ def register_all_tools(mcp: FastMCP) -> None:
         logger.info("Prescription tools registered successfully")
     except Exception as e:
         logger.error(f"Failed to register prescription tools: {e}")
-    
+
+    try:
+        register_records_tools(mcp)
+        logger.info("Records tools registered successfully")
+    except Exception as e:
+        logger.error(f"Failed to register records tools: {e}")
+
     logger.info("All tools registration completed")

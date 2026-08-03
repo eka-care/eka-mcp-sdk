@@ -6,6 +6,7 @@ from .patient_tools import register_patient_tools
 from .appointment_tools import register_appointment_tools
 from .doctor_clinic_tools import register_doctor_clinic_tools, register_discovery_tools
 from .prescription_tools import register_prescription_tools
+from .records_tools import register_records_tools
 from .extra_tools import register_extra_tools
 
 logger = logging.getLogger(__name__)
@@ -20,5 +21,6 @@ def register_doctor_tools(mcp: FastMCP) -> None:
     register_doctor_clinic_tools(mcp)
     register_discovery_tools(mcp)
     register_prescription_tools(mcp)
+    register_records_tools(mcp)
     register_extra_tools(mcp)
     # register_assessment_tools(mcp)

@@ -20,6 +20,8 @@ def create_mcp_server() -> FastMCP:
     
     mcp = FastMCP(
         name="Eka.care EMR API Server",
+        version="0.1.0",
+        website_url="https://www.eka.care",
         stateless_http=True,
         instructions="""
             This is the Eka.care EMR API Server. It is used to manage the Eka.care EMR system.
@@ -29,7 +31,7 @@ def create_mcp_server() -> FastMCP:
         """)
     
     
-    @mcp.tool()
+    @mcp.tool(title="Server Info")
     async def get_server_info(ctx: Context = CurrentContext()) -> dict:
         """
         Get server information and configuration.
