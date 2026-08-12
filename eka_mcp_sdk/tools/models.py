@@ -1,7 +1,7 @@
 """Pydantic models for tool parameters and validation."""
 
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, field_validator
 
 DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -49,6 +49,13 @@ class AppointmentBookingRequest(BaseModel):
         ...,
         description="Clinic's unique identifier from get_business_entities",
     )
+    tag_ids: Optional[List[str]] = Field(
+        None,
+        description=(
+            "List of tag IDs to apply to the appointment. "
+            "Omit or pass [] when unused — never pass an empty string."
+        ),
+    )
     date: str = Field(
         ...,
         description="Appointment date in YYYY-MM-DD format (today or future)",
@@ -85,6 +92,20 @@ class AppointmentBookingRequest(BaseModel):
         None,
         description="Patient gender (M/Male or F/Female). Used for patient registration when patient_id is absent.",
     )
+
+    @field_validator("tag_ids", mode="before")
+    @classmethod
+    def coerce_empty_tag_ids(cls, v):
+        """LLMs often send '' / '[]' for unused optional lists — treat as omitted."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            s = v.strip()
+            if not s or s in ("[]", "null", "None"):
+                return None
+        if v == []:
+            return None
+        return v
 
     @field_validator('date')
     @classmethod

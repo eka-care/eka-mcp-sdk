@@ -32,6 +32,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tele = [
+    "horus-tele @ git+https://github.com/eka-care/horus.git@main",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",

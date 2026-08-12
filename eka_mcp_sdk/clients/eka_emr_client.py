@@ -3,6 +3,13 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
 import logging
 
+# Horus is an optional dependency (install with the "tele" extra); tele-consultation
+# links are skipped when it is not installed.
+try:
+    from horus import AsyncHorusClient
+except ImportError:
+    AsyncHorusClient = None
+
 from .base_emr_client import BaseEMRClient
 from ..utils.eka_response_parsers import (
     parse_slots_to_common_format,
@@ -23,7 +30,8 @@ from ..utils.book_appointment_utils import (
     check_slot_availability,
     create_unavailable_slot_response,
     validate_clinic_schedule,
-    get_slot_end_time
+    get_slot_end_time,
+    build_100ms_meeting_url
 )
 
 logger = logging.getLogger(__name__)
@@ -596,6 +604,7 @@ class EkaEMRClient(BaseEMRClient):
         patient_name: Optional[str] = None,
         dob: Optional[str] = None,
         gender: Optional[str] = None,
+        tag_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.
@@ -674,24 +683,55 @@ class EkaEMRClient(BaseEMRClient):
                 "mode": mode
             }
         }
-        
+
+        if tag_ids:
+            appointment_data.setdefault("appointment_details", {}).setdefault(
+                "custom_attributes", {}
+            )["tags"] = tag_ids
+
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
-        
+
+        # Tele-consultation: create a video consultation link via Horus
+        vc_link_error = None
+        if mode == "VIDEO" and AsyncHorusClient is not None:
+            try:
+                async with AsyncHorusClient() as horus_client:
+                    link = await horus_client.create_consultation_link(
+                        aid=f"{doctor_id}-{clinic_id}-{start_timestamp}"
+                    )
+                appointment_data["vc_meta"] = {
+                    "host_link": build_100ms_meeting_url(link.host_url),
+                    "meet_link": build_100ms_meeting_url(link.guest_url),
+                    "platform": "eka"
+                }
+            except Exception as e:
+                vc_link_error = str(e)
+                logger.warning(f"Failed to create video consultation link: {e}")
+
         result = await self.book_appointment(appointment_data)
-        
+
         # Build successful response
         booked_slot_info = {
             "date": date,
             "start_time": start_time,
             "end_time": actual_end_time
         }
-        
-        return {
+
+        response = {
             "success": True,
             "data": result,
             "booked_slot": booked_slot_info
         }
+
+        if "vc_meta" in appointment_data:
+            response["vc_meta"] = appointment_data["vc_meta"]
+        if vc_link_error:
+            response["vc_link_warning"] = (
+                f"Appointment booked, but the video consultation link could not be created: {vc_link_error}"
+            )
+
+        return response
 
     async def show_appointments(
         self,

@@ -4,6 +4,7 @@ httpx>=0.24.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
+horus-tele @ git+https://github.com/eka-care/horus.git@main
 
 # Optional development dependencies
 # Install with: pip install -r requirements-dev.txt
