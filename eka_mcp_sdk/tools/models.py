@@ -1,7 +1,7 @@
 """Pydantic models for tool parameters and validation."""
 
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, field_validator
 
 DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -48,6 +48,10 @@ class AppointmentBookingRequest(BaseModel):
     clinic_id: str = Field(
         ...,
         description="Clinic's unique identifier from get_business_entities",
+    )
+    tag_ids: Optional[List[str]] = Field(
+        None,
+        description="List of tag IDs to apply to the appointment",
     )
     date: str = Field(
         ...,

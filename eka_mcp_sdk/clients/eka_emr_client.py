@@ -3,6 +3,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
 import logging
 
+from horus import AsyncHorusClient
+
 from .base_emr_client import BaseEMRClient
 from ..utils.eka_response_parsers import (
     parse_slots_to_common_format,
@@ -596,6 +598,7 @@ class EkaEMRClient(BaseEMRClient):
         patient_name: Optional[str] = None,
         dob: Optional[str] = None,
         gender: Optional[str] = None,
+        tag_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.
@@ -674,6 +677,9 @@ class EkaEMRClient(BaseEMRClient):
                 "mode": mode
             }
         }
+
+        if tag_ids:
+            appointment_data["tag_ids"] = tag_ids
         
         if reason:
             appointment_data["appointment_details"]["reason"] = reason

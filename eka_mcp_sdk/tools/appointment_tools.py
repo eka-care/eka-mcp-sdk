@@ -360,6 +360,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         """
         # Convert Pydantic model to dict for deduplication
         booking_dict = booking.model_dump(exclude_none=True)
+
+        tag_ids = booking_dict.get('tag_ids', [])
         
         # Check for duplicate request
         dedup = get_deduplicator()
@@ -403,6 +405,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 patient_name=booking.patient_name,
                 dob=booking.dob,
                 gender=booking.gender,
+                tag_ids=tag_ids,
             )
             
             if result.get("success"):
