@@ -7,6 +7,23 @@ from ..tools.models import AppointmentBookingRequest
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
+def build_100ms_meeting_url(link: str) -> str:
+    """
+    Convert a short-form 100ms link like "eka-livestream-1429/ucs-kkwi-dlv"
+    into a full meeting URL: "https://eka-livestream-1429.app.100ms.live/ucs-kkwi-dlv".
+
+    Links that are already full URLs are returned unchanged.
+    """
+    if not link or link.startswith(("http://", "https://")):
+        return link
+
+    subdomain, _, room_code = link.partition("/")
+    if not room_code:
+        return link
+
+    return f"https://{subdomain}.app.100ms.live/{room_code}"
+
+
 def find_alternate_slots(
     all_slots: List[Dict[str, Any]], 
     requested_date: str, 

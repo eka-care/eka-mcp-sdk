@@ -61,7 +61,7 @@ class BaseEkaClient(ABC):
             logger.debug(f"API Request: {method} {endpoint}")
             if params:
                 logger.debug(f"Request params: {params}")
-            logger.debug(f"Curl command: {curl_cmd}")
+            logger.info("Curl command: %s", curl_cmd)
             
             # Make request
             response = await self._http_client.request(
@@ -78,6 +78,7 @@ class BaseEkaClient(ABC):
             # Handle response
             if response.status_code >= 400:
                 logger.error(f"API error: {response.status_code} - {response.text[:200]}")
+                logger.error("Failed request curl: %s", curl_cmd)
                 
                 error_detail = await self._parse_error_response(response)
                 raise EkaAPIError(

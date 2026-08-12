@@ -3,7 +3,12 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
 import logging
 
-from horus import AsyncHorusClient
+# Horus is an optional dependency (install with the "tele" extra); tele-consultation
+# links are skipped when it is not installed.
+try:
+    from horus import AsyncHorusClient
+except ImportError:
+    AsyncHorusClient = None
 
 from .base_emr_client import BaseEMRClient
 from ..utils.eka_response_parsers import (
@@ -25,7 +30,8 @@ from ..utils.book_appointment_utils import (
     check_slot_availability,
     create_unavailable_slot_response,
     validate_clinic_schedule,
-    get_slot_end_time
+    get_slot_end_time,
+    build_100ms_meeting_url
 )
 
 logger = logging.getLogger(__name__)
@@ -686,15 +692,15 @@ class EkaEMRClient(BaseEMRClient):
 
         # Tele-consultation: create a video consultation link via Horus
         vc_link_error = None
-        if mode == "VIDEO":
+        if mode == "VIDEO" and AsyncHorusClient is not None:
             try:
                 async with AsyncHorusClient() as horus_client:
                     link = await horus_client.create_consultation_link(
                         aid=f"{doctor_id}-{clinic_id}-{start_timestamp}"
                     )
                 appointment_data["vc_meta"] = {
-                    "host_link": link.host_url,
-                    "meet_link": link.guest_url,
+                    "host_link": build_100ms_meeting_url(link.host_url),
+                    "meet_link": build_100ms_meeting_url(link.guest_url),
                     "platform": "eka"
                 }
             except Exception as e:

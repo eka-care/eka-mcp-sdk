@@ -51,7 +51,10 @@ class AppointmentBookingRequest(BaseModel):
     )
     tag_ids: Optional[List[str]] = Field(
         None,
-        description="List of tag IDs to apply to the appointment",
+        description=(
+            "List of tag IDs to apply to the appointment. "
+            "Omit or pass [] when unused — never pass an empty string."
+        ),
     )
     date: str = Field(
         ...,
@@ -89,6 +92,20 @@ class AppointmentBookingRequest(BaseModel):
         None,
         description="Patient gender (M/Male or F/Female). Used for patient registration when patient_id is absent.",
     )
+
+    @field_validator("tag_ids", mode="before")
+    @classmethod
+    def coerce_empty_tag_ids(cls, v):
+        """LLMs often send '' / '[]' for unused optional lists — treat as omitted."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            s = v.strip()
+            if not s or s in ("[]", "null", "None"):
+                return None
+        if v == []:
+            return None
+        return v
 
     @field_validator('date')
     @classmethod
