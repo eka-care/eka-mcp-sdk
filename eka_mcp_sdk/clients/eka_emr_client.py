@@ -680,24 +680,50 @@ class EkaEMRClient(BaseEMRClient):
 
         if tag_ids:
             appointment_data["tag_ids"] = tag_ids
-        
+
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
-        
+
+        # Tele-consultation: create a video consultation link via Horus
+        vc_link_error = None
+        if mode == "VIDEO":
+            try:
+                async with AsyncHorusClient() as horus_client:
+                    link = await horus_client.create_consultation_link(
+                        aid=f"{doctor_id}-{clinic_id}-{start_timestamp}"
+                    )
+                appointment_data["vc_meta"] = {
+                    "host_link": link.host_url,
+                    "meet_link": link.guest_url,
+                    "platform": "eka"
+                }
+            except Exception as e:
+                vc_link_error = str(e)
+                logger.warning(f"Failed to create video consultation link: {e}")
+
         result = await self.book_appointment(appointment_data)
-        
+
         # Build successful response
         booked_slot_info = {
             "date": date,
             "start_time": start_time,
             "end_time": actual_end_time
         }
-        
-        return {
+
+        response = {
             "success": True,
             "data": result,
             "booked_slot": booked_slot_info
         }
+
+        if "vc_meta" in appointment_data:
+            response["vc_meta"] = appointment_data["vc_meta"]
+        if vc_link_error:
+            response["vc_link_warning"] = (
+                f"Appointment booked, but the video consultation link could not be created: {vc_link_error}"
+            )
+
+        return response
 
     async def show_appointments(
         self,
