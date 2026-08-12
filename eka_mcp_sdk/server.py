@@ -5,6 +5,7 @@ import logging
 from fastmcp import FastMCP
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
@@ -15,12 +16,62 @@ from eka_mcp_sdk.tools.abha_tools import register_abha_tools
 logger = logging.getLogger(__name__)
 
 
+class WorkspaceToolFilter(Middleware):
+    """Filter the listed tools to those allowed for the caller's workspace.
+
+    Replaces the previous ``_list_tools`` monkeypatch with FastMCP's supported
+    middleware hook. Runs within the request context, so workspace resolution
+    from HTTP headers works as before. Fails open (returns all tools) if the
+    workspace has no configured allowlist.
+    """
+
+    async def on_list_tools(self, context: MiddlewareContext, call_next):
+        all_tools = await call_next(context)
+        try:
+            from eka_mcp_sdk.utils.workspace_utils import get_workspace_id
+
+            workspace_id = get_workspace_id() or "ekaemr"
+            workspace_tools = settings.workspace_tools_dict
+            if isinstance(workspace_tools, str):
+                workspace_tools = json.loads(workspace_tools)
+
+            allowed_tool_names = set(workspace_tools.get(workspace_id) or [])
+            if not allowed_tool_names:
+                return all_tools
+
+            filtered_tools = [t for t in all_tools if t.name in allowed_tool_names]
+            logger.info(
+                f"Workspace '{workspace_id}': Listed {len(filtered_tools)}/{len(all_tools)} tools"
+            )
+            return filtered_tools
+        except Exception as e:
+            logger.warning(f"Error filtering tools by workspace: {e}, returning all tools")
+            return all_tools
+
+
+# Tools that are registered but intentionally not exposed yet (internal or
+# "basic" variants superseded by their comprehensive counterparts). In
+# FastMCP 3.x, per-tool `enabled=False` is replaced by server.disable().
+_DISABLED_TOOLS = {
+    "get_prescription_details_basic",
+    "get_appointment_details_basic",
+    "get_appointment_details_enriched",
+    "get_patient_appointments_enriched",
+    "show_appointments_enriched",
+    "update_appointment",
+    "get_doctor_services",
+    "get_comprehensive_doctor_profile",
+    "get_comprehensive_clinic_profile",
+}
+
+
 def create_mcp_server() -> FastMCP:
     """Create and configure the MCP server."""
     
     mcp = FastMCP(
         name="Eka.care EMR API Server",
-        stateless_http=True,
+        version="0.1.0",
+        website_url="https://www.eka.care",
         instructions="""
             This is the Eka.care EMR API Server. It is used to manage the Eka.care EMR system.
             Provides capabilities to manage appointments, prescriptions, and patient records.
@@ -29,7 +80,7 @@ def create_mcp_server() -> FastMCP:
         """)
     
     
-    @mcp.tool()
+    @mcp.tool(title="Server Info")
     async def get_server_info(ctx: Context = CurrentContext()) -> dict:
         """
         Get server information and configuration.
@@ -57,45 +108,12 @@ def create_mcp_server() -> FastMCP:
     register_doctor_tools(mcp)
     register_abha_tools(mcp)
 
-    # Properly wrap _list_tools to add workspace filtering
-    # We need to preserve the original method's signature and self binding
-    from eka_mcp_sdk.utils.workspace_utils import get_workspace_id
-    import functools
-    
-    # Get the original unbound method
-    original_list_tools = FastMCP._list_tools
-    
-    @functools.wraps(original_list_tools)
-    async def workspace_filtered_list_tools(*args, **kwargs):
-        """Wrapper that filters tools based on workspace from headers."""
-        # Call the original method to get all tools
-        all_tools = await original_list_tools(*args, **kwargs)
-        
-        # Apply workspace filtering
-        try:
-            workspace_id = get_workspace_id() or "ekaemr"
-            WORKSPACE_TOOLS_DICT = settings.workspace_tools_dict
-            if WORKSPACE_TOOLS_DICT is str:
-                WORKSPACE_TOOLS_DICT = json.loads(WORKSPACE_TOOLS_DICT)
+    # Keep internal/basic variants registered but hidden (replaces enabled=False)
+    mcp.disable(names=_DISABLED_TOOLS, components={"tool"})
 
-            allowed_tool_names = set(WORKSPACE_TOOLS_DICT.get(workspace_id))
+    # Filter listed tools per workspace via supported middleware hook
+    mcp.add_middleware(WorkspaceToolFilter())
 
-            # Filter tools to only those allowed for this workspace
-            filtered_tools = [
-                tool for tool in all_tools 
-                if tool.name in allowed_tool_names
-            ]
-            
-            logger.info(f"Workspace '{workspace_id}': Listed {len(filtered_tools)}/{len(all_tools)} tools")
-            return filtered_tools
-        except Exception as e:
-            logger.warning(f"Error filtering tools by workspace: {e}, returning all tools")
-            return all_tools
-    
-    # Bind the wrapper as a method on the mcp instance
-    import types
-    mcp._list_tools = types.MethodType(workspace_filtered_list_tools, mcp)
-    
     return mcp
 
 
@@ -128,7 +146,7 @@ def main():
     
     if args.transport == "http":
         logger.info(f"Running HTTP server on {args.host}:{args.port}")
-        mcp.run(transport="http", host=args.host, port=args.port)
+        mcp.run(transport="http", host=args.host, port=args.port, stateless_http=True)
     else:
         logger.info("Running with stdio transport")
         mcp.run()

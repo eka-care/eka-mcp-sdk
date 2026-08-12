@@ -3,6 +3,13 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
 import logging
 
+# Horus is an optional dependency (install with the "tele" extra); tele-consultation
+# links are skipped when it is not installed.
+try:
+    from horus import AsyncHorusClient
+except ImportError:
+    AsyncHorusClient = None
+
 from .base_emr_client import BaseEMRClient
 from ..utils.eka_response_parsers import (
     parse_slots_to_common_format,
@@ -23,7 +30,8 @@ from ..utils.book_appointment_utils import (
     check_slot_availability,
     create_unavailable_slot_response,
     validate_clinic_schedule,
-    get_slot_end_time
+    get_slot_end_time,
+    build_100ms_meeting_url
 )
 
 logger = logging.getLogger(__name__)
@@ -248,12 +256,17 @@ class EkaEMRClient(BaseEMRClient):
         
         Returns:
             {
-                "date": "YYYY-MM-DD",
+                "date": "YYYY-MM-DD",  # requested start date
                 "doctor_id": "...",
                 "clinic_id": "...",
-                "all_slots": ["HH:MM", ...],
+                "dates": [
+                    {
+                        "date": "YYYY-MM-DD",
+                        "all_slots": ["HH:MM", ...],
+                        "slot_categories": [{"category": "consultation", "slots": [...]}]
+                    }
+                ],
                 "slot_config": {"interval_minutes": 15},
-                "slot_categories": [{"category": "consultation", "slots": [...]}],
                 "pricing": {"consultation_fee": 500, "currency": "INR"},
                 "metadata": {}
             }
@@ -553,7 +566,11 @@ class EkaEMRClient(BaseEMRClient):
             # For each available date, get the slots
             for date_str in available_dates:
                 slots_result = await self.get_available_slots(doctor_id, clinic_id, date_str)
-                slots = slots_result.get('all_slots', [])
+                slots = []
+                for day in slots_result.get('dates', []):
+                    if day.get('date') == date_str:
+                        slots = day.get('all_slots', [])
+                        break
                 
                 # Filter slots for today to have at least 15 min buffer from current time
                 if date_str == today_str and slots:
@@ -634,6 +651,7 @@ class EkaEMRClient(BaseEMRClient):
         patient_name: Optional[str] = None,
         dob: Optional[str] = None,
         gender: Optional[str] = None,
+        tag_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.
@@ -712,24 +730,55 @@ class EkaEMRClient(BaseEMRClient):
                 "mode": mode
             }
         }
-        
+
+        if tag_ids:
+            appointment_data.setdefault("appointment_details", {}).setdefault(
+                "custom_attributes", {}
+            )["tags"] = tag_ids
+
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
-        
+
+        # Tele-consultation: create a video consultation link via Horus
+        vc_link_error = None
+        if mode == "VIDEO" and AsyncHorusClient is not None:
+            try:
+                async with AsyncHorusClient() as horus_client:
+                    link = await horus_client.create_consultation_link(
+                        aid=f"{doctor_id}-{clinic_id}-{start_timestamp}"
+                    )
+                appointment_data["vc_meta"] = {
+                    "host_link": build_100ms_meeting_url(link.host_url),
+                    "meet_link": build_100ms_meeting_url(link.guest_url),
+                    "platform": "eka"
+                }
+            except Exception as e:
+                vc_link_error = str(e)
+                logger.warning(f"Failed to create video consultation link: {e}")
+
         result = await self.book_appointment(appointment_data)
-        
+
         # Build successful response
         booked_slot_info = {
             "date": date,
             "start_time": start_time,
             "end_time": actual_end_time
         }
-        
-        return {
+
+        response = {
             "success": True,
             "data": result,
             "booked_slot": booked_slot_info
         }
+
+        if "vc_meta" in appointment_data:
+            response["vc_meta"] = appointment_data["vc_meta"]
+        if vc_link_error:
+            response["vc_link_warning"] = (
+                f"Appointment booked, but the video consultation link could not be created: {vc_link_error}"
+            )
+
+        return response
 
     async def show_appointments(
         self,
@@ -949,6 +998,116 @@ class EkaEMRClient(BaseEMRClient):
             method="GET",
             endpoint=f"/dr/v1/prescription/{prescription_id}"
         )
+
+    # Medical Records (Vault) APIs
+    async def list_medical_records(
+        self,
+        patient_id: str,
+        updated_after: Optional[int] = None,
+        offset: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """List a patient's medical records (documents).
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            updated_after: Only return records updated after this epoch (seconds)
+            offset: Pagination token (next_token from a previous response)
+        """
+        params: Dict[str, Any] = {}
+        if updated_after is not None:
+            params["u_at__gt"] = updated_after
+        if offset:
+            params["offset"] = offset
+        return await self._make_request(
+            method="GET",
+            endpoint="/mr/api/v1/docs",
+            params=params or None,
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def get_medical_record(
+        self,
+        patient_id: str,
+        document_id: str,
+    ) -> Dict[str, Any]:
+        """Get a single medical record's metadata and signed download URL.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            document_id: Unique identifier of the record/document
+        """
+        return await self._make_request(
+            method="GET",
+            endpoint=f"/mr/api/v1/docs/{document_id}",
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def delete_medical_record(
+        self,
+        patient_id: str,
+        document_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a patient's medical record (document). Irreversible.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            document_id: Unique identifier of the record/document to delete
+        """
+        return await self._make_request(
+            method="DELETE",
+            endpoint=f"/mr/api/v1/docs/{document_id}",
+            headers={"X-Pt-Id": patient_id, "Accept": "application/json"},
+        )
+
+    async def initiate_medical_record_upload(
+        self,
+        patient_id: str,
+        batch_request: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Step 1 of upload: register document metadata and obtain presigned upload URLs.
+
+        Args:
+            patient_id: Eka user OID of the patient (sent as the X-Pt-Id header)
+            batch_request: List of document upload requests, each containing at
+                least a ``files`` array of ``{contentType, file_size}`` entries.
+        """
+        return await self._make_request(
+            method="POST",
+            endpoint="/mr/api/v1/docs",
+            data={"batch_request": batch_request},
+            headers={"X-Pt-Id": patient_id},
+        )
+
+    async def upload_file_to_presigned_url(
+        self,
+        url: str,
+        fields: Dict[str, Any],
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> int:
+        """Step 2 of upload: POST the file bytes to the presigned storage URL.
+
+        Makes a direct multipart/form-data request (bypassing _make_request)
+        because this hits object storage (S3) directly and must NOT include the
+        eka auth headers or client-id.
+
+        Returns:
+            The HTTP status code from storage (204 on success).
+        """
+        files = {"file": (filename, file_bytes, content_type)}
+        response = await self._http_client.request(
+            method="POST",
+            url=url,
+            data=fields,
+            files=files,
+        )
+        if response.status_code >= 400:
+            raise EkaAPIError(
+                message=f"Failed to upload file to storage: {response.text[:200]}",
+                status_code=response.status_code,
+            )
+        return response.status_code
 
     # Service APIs
     async def service_availability_elicitation(

@@ -36,29 +36,38 @@ def parse_slots_to_common_format(
     }
     
     Returns:
-        Common format:
+        Common format (slots grouped by date from each slot's start time):
         {
-            "date": "YYYY-MM-DD",
             "doctor_id": "...",
             "clinic_id": "...",
-            "all_slots": ["HH:MM", ...],
+            "dates": [
+                {
+                    "date": "YYYY-MM-DD",
+                    "all_slots": ["HH:MM", ...],
+                    "slot_categories": [{"category": "consultation", "slots": [...]}]
+                }
+            ],
             "slot_config": {"interval_minutes": 15},
-            "slot_categories": [{"category": "consultation", "slots": [...]}],
             "pricing": {"consultation_fee": 500, "currency": "INR"},
             "metadata": {}
         }
+    
+    Note:
+        ``date`` is retained for call-site compatibility (requested start date) and
+        is not used to filter slots — grouping uses each slot's ``s`` timestamp.
     """
     schedule_data = raw_response.get('data', {}).get('schedule', {})
     clinic_schedule = schedule_data.get(clinic_id, [])
     
-    all_slots: List[str] = []
-    slot_categories: List[Dict[str, Any]] = []
+    # date -> { all_slots: set[str], categories: {category: set[str]} }
+    dates_map: Dict[str, Dict[str, Any]] = {}
     pricing: Dict[str, Any] = {}
     interval_minutes: Optional[int] = None
+    interval_candidates: List[str] = []
     
     for service in clinic_schedule:
         service_name = service.get('service_name', 'Consultation')
-        category_slots: List[str] = []
+        category = service_name.lower().replace(' ', '_')
         
         # Extract pricing from first service
         if not pricing:
@@ -70,43 +79,60 @@ def parse_slots_to_common_format(
                 pricing['currency'] = 'INR'
         
         for slot in service.get('slots', []):
-            if slot.get('available', False):
-                slot_start = slot.get('s', '')
-                
-                if slot_start:
-                    time_str = extract_time_24h(slot_start)
-                    if time_str:
-                        all_slots.append(time_str)
-                        category_slots.append(time_str)
-                        
-                        # Calculate interval from first two slots
-                        if interval_minutes is None and len(all_slots) >= 2:
-                            interval_minutes = calculate_interval(all_slots[0], all_slots[1])
-        
-        # Add category if has slots
-        if category_slots:
-            slot_categories.append({
-                "category": service_name.lower().replace(' ', '_'),
-                "slots": sorted(category_slots)
+            if not slot.get('available', False):
+                continue
+            
+            slot_start = slot.get('s', '')
+            if not slot_start:
+                continue
+            
+            date_part = slot_start.split('T')[0]
+            time_str = extract_time_24h(slot_start)
+            if not date_part or not time_str:
+                continue
+            
+            day = dates_map.setdefault(date_part, {
+                "all_slots": set(),
+                "categories": {},
             })
+            day["all_slots"].add(time_str)
+            day["categories"].setdefault(category, set()).add(time_str)
+            
+            # Interval from first two available slots in API order (same calendar day preferred)
+            if interval_minutes is None:
+                interval_candidates.append(time_str)
+                if len(interval_candidates) >= 2:
+                    interval_minutes = calculate_interval(
+                        interval_candidates[0], interval_candidates[1]
+                    )
     
-    # Sort and deduplicate all slots
-    all_slots = sorted(set(all_slots))
+    dates: List[Dict[str, Any]] = []
+    for day_date in sorted(dates_map.keys()):
+        day = dates_map[day_date]
+        day_entry: Dict[str, Any] = {
+            "date": day_date,
+            "all_slots": sorted(day["all_slots"]),
+        }
+        slot_categories = [
+            {"category": cat, "slots": sorted(times)}
+            for cat, times in sorted(day["categories"].items())
+        ]
+        if slot_categories:
+            day_entry["slot_categories"] = slot_categories
+        dates.append(day_entry)
     
-    # Build response
     response: Dict[str, Any] = {
-        "date": date,
         "doctor_id": doctor_id,
         "clinic_id": clinic_id,
-        "all_slots": all_slots
+        "dates": dates,
     }
     
-    # Add optional fields
+    # Keep requested start date for callers that still expect it
+    if date:
+        response["date"] = date.split('T')[0] if 'T' in date else date
+    
     if interval_minutes:
         response["slot_config"] = {"interval_minutes": interval_minutes}
-    
-    if slot_categories:
-        response["slot_categories"] = slot_categories
     
     if pricing:
         response["pricing"] = pricing

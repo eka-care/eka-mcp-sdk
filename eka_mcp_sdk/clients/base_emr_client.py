@@ -227,6 +227,30 @@ class BaseEMRClient(BaseEkaClient):
         """Get Prescription details."""
         pass
 
+    # ==================== Medical Records Operations ====================
+
+    @abstractmethod
+    async def list_medical_records(self, patient_id: str, updated_after: Optional[int] = None,
+                                   offset: Optional[str] = None) -> Dict[str, Any]:
+        """List a patient's medical records (documents)."""
+        pass
+
+    @abstractmethod
+    async def get_medical_record(self, patient_id: str, document_id: str) -> Dict[str, Any]:
+        """Get a single medical record's metadata and download URL."""
+        pass
+
+    @abstractmethod
+    async def delete_medical_record(self, patient_id: str, document_id: str) -> Dict[str, Any]:
+        """Delete a patient's medical record (document)."""
+        pass
+
+    @abstractmethod
+    async def initiate_medical_record_upload(self, patient_id: str,
+                                             batch_request: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Register document metadata and obtain presigned upload URLs."""
+        pass
+
     # ==================== Services Tools ====================
     @abstractmethod
     async def service_availability_elicitation(

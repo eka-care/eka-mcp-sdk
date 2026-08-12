@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dependencies = [
-    "fastmcp==2.14.5",
+    "fastmcp==3.4.5",
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
@@ -32,6 +32,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tele = [
+    "horus-tele @ git+https://github.com/eka-care/horus.git@main",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",

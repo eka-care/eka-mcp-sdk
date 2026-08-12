@@ -64,7 +64,13 @@ class AppointmentService:
                 "date": "YYYY-MM-DD",
                 "doctor_id": "...",
                 "clinic_id": "...",
-                "all_slots": ["HH:MM", ...],
+                "dates": [
+                    {
+                        "date": "YYYY-MM-DD",
+                        "all_slots": ["HH:MM", ...],
+                        "slot_categories": [{"category": "consultation", "slots": [...]}]
+                    }
+                ],
                 "slot_config": {"interval_minutes": 15},
                 "pricing": {...},
                 "metadata": {}
@@ -155,6 +161,7 @@ class AppointmentService:
         patient_name: Optional[str] = None,
         dob: Optional[str] = None,
         gender: Optional[str] = None,
+        tag_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
@@ -177,6 +184,7 @@ class AppointmentService:
             patient_name=patient_name,
             dob=dob,
             gender=gender,
+            tag_ids=tag_ids,
         )
 
     async def book_appointment_v2(

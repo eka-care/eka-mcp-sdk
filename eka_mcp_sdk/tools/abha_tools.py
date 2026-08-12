@@ -11,6 +11,7 @@ from fastmcp.server.context import Context
 from ..clients.abha_client import AbhaClient
 from ..services.abha_service import AbhaService
 from ..auth.models import EkaAPIError
+from ..utils.fastmcp_helper import write_tool_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def _make_service() -> AbhaService:
 def register_abha_tools(mcp: FastMCP) -> None:
     """Register ABHA/ABDM MCP tools."""
 
-    @mcp.tool(tags={"abha", "login", "abdm"})
+    @mcp.tool(title="ABHA: Send OTP", tags={"abha", "login", "abdm"}, annotations=write_tool_annotations())
     async def abha_send_otp(
         mobile_number: Annotated[str, "10-digit mobile number registered with ABHA"],
         ctx: Context = CurrentContext(),
@@ -50,7 +51,7 @@ def register_abha_tools(mcp: FastMCP) -> None:
             await ctx.error(f"[abha_send_otp] Failed: {e.message}")
             return {"success": False, "error": e.message, "status_code": e.status_code}
 
-    @mcp.tool(tags={"abha", "login", "abdm"})
+    @mcp.tool(title="ABHA: Verify OTP", tags={"abha", "login", "abdm"}, annotations=write_tool_annotations())
     async def abha_verify_otp(
         otp: Annotated[str, "OTP received by the user on their mobile"],
         txn_id: Annotated[str, "Transaction ID returned by abha_send_otp"],
@@ -79,7 +80,7 @@ def register_abha_tools(mcp: FastMCP) -> None:
             await ctx.error(f"[abha_verify_otp] Failed: {e.message}")
             return {"success": False, "error": e.message, "status_code": e.status_code}
 
-    @mcp.tool(tags={"abha", "login", "abdm"})
+    @mcp.tool(title="ABHA: Select Profile", tags={"abha", "login", "abdm"}, annotations=write_tool_annotations())
     async def abha_select_profile(
         phr_address: Annotated[str, "The ABHA address selected by the user (e.g. user@abdm)"],
         txn_id: Annotated[str, "Transaction ID returned by abha_verify_otp"],

@@ -295,6 +295,18 @@ cat examples/MCP_USAGE.md
 - **Email**: ekaconnect@eka.care
 - **Issues**: [GitHub Issues](https://github.com/eka-care/eka-mcp-sdk/issues)
 
+## Privacy Policy
+
+This connector accesses protected health information (patient demographics,
+appointments, prescriptions, and medical records). Data is processed only to
+fulfill the requested operation against the Eka.care APIs and is not stored by
+the MCP server itself.
+
+- **Privacy Policy**: https://www.eka.care/privacy-policy
+
+The privacy policy is also presented to end users during the OAuth
+authorization/consent flow when connecting this server.
+
 ## License
 
 MIT License - see LICENSE file for details.

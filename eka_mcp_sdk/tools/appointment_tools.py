@@ -191,6 +191,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     """Register Enhanced Appointment Management MCP tools."""
     
     @mcp.tool(
+        title="Appointment Slots",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -235,7 +236,10 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
             
-            slot_count = len(result.get('slots', [])) if isinstance(result, dict) else 0
+            slot_count = sum(
+                len(day.get('all_slots', []))
+                for day in (result.get('dates', []) if isinstance(result, dict) else [])
+            )
             await ctx.info(f"[get_appointment_slots] Completed successfully - {slot_count} slots available\n")
             
             return {"success": True, "data": result}
@@ -251,6 +255,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Available Appointment Dates",
         tags={"appointment", "read", "dates", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -347,6 +352,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Available Slots",
         tags={"appointment", "read", "slots", "availability"},
         annotations=readonly_tool_annotations()
     )
@@ -367,7 +373,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         slots on [date], openings on [date]
         
         Returns:
-            Unified contract with all_slots (24h format), slot_categories, pricing, metadata
+            Unified contract with dates[].all_slots (24h format), slot_categories, pricing, metadata
         """
         await ctx.info(f"[get_available_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
         
@@ -399,7 +405,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 doctor_id, clinic_id, date
             )
             
-            await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
+            slot_count = sum(
+                len(day.get('all_slots', []))
+                for day in response_data.get('dates', [])
+            )
+            await ctx.info(f"[get_available_slots] Found {slot_count} available slots\n")
             
             return response_data
             
@@ -410,6 +420,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Book Appointment",
         tags={"appointment", "write", "book", "create"},
         annotations=write_tool_annotations()
     )
@@ -438,6 +449,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         """
         # Convert Pydantic model to dict for deduplication
         booking_dict = booking.model_dump(exclude_none=True)
+
+        tag_ids = booking_dict.get('tag_ids', [])
         
         # Check for duplicate request
         dedup = get_deduplicator()
@@ -488,6 +501,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 patient_name=booking.patient_name,
                 dob=booking.dob,
                 gender=booking.gender,
+                tag_ids=tag_ids,
             )
             
             if result.get("success"):
@@ -515,7 +529,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
         
     @mcp.tool(
-        enabled=False,
+        title="Show Appointments (Detailed)",
         tags={"appointment", "read", "list", "enriched"},
         annotations=readonly_tool_annotations() 
     )
@@ -590,6 +604,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Show Appointments (Basic)",
         tags={"appointment", "read", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -658,7 +673,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,   
+        title="Appointment Details (Detailed)",
         tags={"appointment", "read", "details", "enriched"},
         annotations=readonly_tool_annotations()
     )
@@ -712,7 +727,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool(
-        enabled=False,
+        title="Appointment Details (Basic)",
         tags={"appointment", "read", "details", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -763,7 +778,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
+        title="Patient Appointments (Detailed)",
         tags={"appointment", "read", "patient", "list", "enriched"},
         annotations=readonly_tool_annotations()
     )
@@ -822,6 +837,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Patient Appointments (Basic)",
         tags={"appointment", "read", "patient", "list", "basic"},
         annotations=readonly_tool_annotations()
     )
@@ -875,7 +891,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=False,
+        title="Update Appointment",
         tags={"appointment", "write", "update"},
         annotations=write_tool_annotations()
     )
@@ -930,6 +946,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Complete Appointment",
         tags={"appointment", "write", "complete", "status"},
         annotations=write_tool_annotations()
     )
@@ -983,6 +1000,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
+        title="Cancel Appointment",
         tags={"appointment", "write", "cancel", "destructive"},
         annotations=write_tool_annotations(destructive=True)
     )
@@ -1034,7 +1052,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             }
     
     @mcp.tool(
-        enabled=True,
+        title="Reschedule Appointment",
         tags={"appointment", "write", "reschedule"},
         annotations=write_tool_annotations()
     )
@@ -1089,6 +1107,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
     
     # healtcheck Tools
     @mcp.tool(
+        title="Book Service",
         tags={"appointment", "write", "book", "create"},
         annotations=write_tool_annotations()
     )
