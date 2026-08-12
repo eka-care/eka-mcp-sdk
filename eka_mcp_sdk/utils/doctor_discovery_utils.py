@@ -53,19 +53,20 @@ def parse_slots_to_date_map(
     
     Works with common format from client:
     {
-        "date": "YYYY-MM-DD",
-        "all_slots": ["HH:MM", ...],
+        "dates": [
+            {"date": "YYYY-MM-DD", "all_slots": ["HH:MM", ...]},
+            ...
+        ],
         ...
     }
     """
     date_slots_map: Dict[str, List[str]] = {}
     
-    # Common format from client
-    date = slots_result.get('date', '')
-    all_slots = slots_result.get('all_slots', [])
-    
-    if date and all_slots:
-        date_slots_map[date] = all_slots
+    for day in slots_result.get('dates', []):
+        day_date = day.get('date', '')
+        all_slots = day.get('all_slots', [])
+        if day_date and all_slots:
+            date_slots_map[day_date] = all_slots
     
     return date_slots_map
 

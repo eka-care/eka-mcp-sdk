@@ -55,7 +55,13 @@ class AppointmentService:
                 "date": "YYYY-MM-DD",
                 "doctor_id": "...",
                 "clinic_id": "...",
-                "all_slots": ["HH:MM", ...],
+                "dates": [
+                    {
+                        "date": "YYYY-MM-DD",
+                        "all_slots": ["HH:MM", ...],
+                        "slot_categories": [{"category": "consultation", "slots": [...]}]
+                    }
+                ],
                 "slot_config": {"interval_minutes": 15},
                 "pricing": {...},
                 "metadata": {}

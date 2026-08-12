@@ -256,12 +256,17 @@ class EkaEMRClient(BaseEMRClient):
         
         Returns:
             {
-                "date": "YYYY-MM-DD",
+                "date": "YYYY-MM-DD",  # requested start date
                 "doctor_id": "...",
                 "clinic_id": "...",
-                "all_slots": ["HH:MM", ...],
+                "dates": [
+                    {
+                        "date": "YYYY-MM-DD",
+                        "all_slots": ["HH:MM", ...],
+                        "slot_categories": [{"category": "consultation", "slots": [...]}]
+                    }
+                ],
                 "slot_config": {"interval_minutes": 15},
-                "slot_categories": [{"category": "consultation", "slots": [...]}],
                 "pricing": {"consultation_fee": 500, "currency": "INR"},
                 "metadata": {}
             }
@@ -523,7 +528,11 @@ class EkaEMRClient(BaseEMRClient):
             # For each available date, get the slots
             for date_str in available_dates:
                 slots_result = await self.get_available_slots(doctor_id, clinic_id, date_str)
-                slots = slots_result.get('all_slots', [])
+                slots = []
+                for day in slots_result.get('dates', []):
+                    if day.get('date') == date_str:
+                        slots = day.get('all_slots', [])
+                        break
                 
                 # Filter slots for today to have at least 15 min buffer from current time
                 if date_str == today_str and slots:

@@ -154,7 +154,10 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             appointment_service = AppointmentService(client)
             result = await appointment_service.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
             
-            slot_count = len(result.get('slots', [])) if isinstance(result, dict) else 0
+            slot_count = sum(
+                len(day.get('all_slots', []))
+                for day in (result.get('dates', []) if isinstance(result, dict) else [])
+            )
             await ctx.info(f"[get_appointment_slots] Completed successfully - {slot_count} slots available\n")
             
             return {"success": True, "data": result}
@@ -288,7 +291,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         slots on [date], openings on [date]
         
         Returns:
-            Unified contract with all_slots (24h format), slot_categories, pricing, metadata
+            Unified contract with dates[].all_slots (24h format), slot_categories, pricing, metadata
         """
         await ctx.info(f"[get_available_slots] Getting slots for doctor {doctor_id} at clinic {clinic_id} on {date}")
         
@@ -320,7 +323,11 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 doctor_id, clinic_id, date
             )
             
-            await ctx.info(f"[get_available_slots] Found {len(response_data.get('all_slots', []))} available slots\n")
+            slot_count = sum(
+                len(day.get('all_slots', []))
+                for day in response_data.get('dates', [])
+            )
+            await ctx.info(f"[get_available_slots] Found {slot_count} available slots\n")
             
             return response_data
             
