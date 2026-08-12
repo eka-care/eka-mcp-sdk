@@ -685,7 +685,9 @@ class EkaEMRClient(BaseEMRClient):
         }
 
         if tag_ids:
-            appointment_data["tag_ids"] = tag_ids
+            appointment_data.setdefault("appointment_details", {}).setdefault(
+                "custom_attributes", {}
+            )["tags"] = tag_ids
 
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
