@@ -400,6 +400,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
+            session_id = custom_headers.get("session-id")
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
@@ -419,7 +420,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 dob=booking.dob,
                 gender=booking.gender,
                 tag_ids=tag_ids,
-                conversation_id=conversation_id,
+                session_id=session_id,
             )
             
             if result.get("success"):

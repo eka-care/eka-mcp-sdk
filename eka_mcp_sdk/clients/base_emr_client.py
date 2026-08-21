@@ -173,7 +173,7 @@ class BaseEMRClient(BaseEkaClient):
         dob: Optional[str] = None,
         gender: Optional[str] = None,
         tag_ids: Optional[List[str]] = None,
-        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
