@@ -614,6 +614,7 @@ class EkaEMRClient(BaseEMRClient):
         dob: Optional[str] = None,
         gender: Optional[str] = None,
         tag_ids: Optional[List[str]] = None,
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.
@@ -690,7 +691,11 @@ class EkaEMRClient(BaseEMRClient):
                 "start_time": start_timestamp,
                 "end_time": end_timestamp,
                 "mode": mode
-            }
+            },
+            "partner_meta": {
+                "conversation_id": conversation_id,
+                "source": "EkaAgents",
+            },
         }
 
         if tag_ids:
