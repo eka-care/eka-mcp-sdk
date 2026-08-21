@@ -153,6 +153,7 @@ class AppointmentService:
         dob: Optional[str] = None,
         gender: Optional[str] = None,
         tag_ids: Optional[List[str]] = None,
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
@@ -176,6 +177,7 @@ class AppointmentService:
             dob=dob,
             gender=gender,
             tag_ids=tag_ids,
+            conversation_id=conversation_id,
         )
     
     async def doctor_availability_elicitation(
