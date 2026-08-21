@@ -1,3 +1,4 @@
+import datetime
 from typing import Any, Dict, Optional, List, Annotated
 import logging
 from fastmcp import FastMCP
@@ -15,8 +16,51 @@ from ..utils.tool_registration import get_extra_headers, get_supports_elicitatio
 from ..services.appointment_service import AppointmentService
 from ..utils.workspace_utils import get_workspace_id
 from ..clients.client_factory import ClientFactory
+from ..utils.doctor_discovery_utils import (
+    build_elicitation_response,
+    build_elicitation_success_response,
+    build_plain_availability_response,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _build_doctor_availability_response(
+    doctor_availability: Dict[str, Any],
+    supports_elicitation: bool,
+    doctor_id: Optional[str],
+    hospital_id: Optional[str],
+) -> Dict[str, Any]:
+    if supports_elicitation:
+        return build_elicitation_response(
+            doctor_availability["doctors"],
+            doctor_availability["doctor_details"],
+            bool(doctor_id),
+            doctor_id,
+            hospital_id,
+        )
+
+    doctors = doctor_availability["doctors"]
+    details = doctor_availability["doctor_details"]
+
+    def _to_plain(entry: Dict[str, Any]) -> Dict[str, Any]:
+        current_id = entry.get("doctor_id", "")
+        return build_plain_availability_response(
+            current_id,
+            entry,
+            details.get(current_id, {}),
+        )
+
+    if doctor_id:
+        selected_entry = next(
+            (d for d in doctors if d.get("doctor_id") == doctor_id),
+            doctors[0] if doctors else {},
+        )
+        if not selected_entry:
+            return {}
+        return _to_plain(selected_entry)
+
+    return {"doctors": [_to_plain(d) for d in doctors]}
 
 
 def register_doctor_clinic_tools(mcp: FastMCP) -> None:
@@ -513,23 +557,19 @@ def register_discovery_tools(mcp: FastMCP) -> None:
 
         Typical use cases (guidance, not strict rules):
         - Appointment booking intent or rescheduling flows
-        - When doctor availability or doctor details need to be discovered or displayed to the user
-        - After search_doctor_tool returns matches and the user needs to choose one
-        - When a specific doctor is already in context and the user wants to see slots
+        - When doctor_id is available from search_doctor result and availability or doctor details need to be discovered or displayed to the user
 
         Parameters — pass exactly ONE of `suggested_doctor_ids` OR `doctor_id`:
         - suggested_doctor_ids (list[str]): multiple candidate doctor IDs to present to the user
-        - doctor_id (str): a single doctor ID when one is already selected
+        - doctor_id (str): a single doctor ID when one is already selected/ preferred
         - hospital_id (str, optional): include only when known
         - preferred_date (str, optional): YYYY-MM-DD, only if user stated a date
         - preferred_slot_time (str, optional): HH:MM, only if user stated a time
 
         Sourcing IDs (important — do not hallucinate):
         All IDs (doctor_id, suggested_doctor_ids, hospital_id) must come from one of:
-        – a prior search_doctor_tool result in this conversation
-        – a prior result of this tool
-        – explicit conversation context where the ID was provided
-        If no such ID is available, call search_doctor_tool first instead of guessing.
+        - a prior search_doctor result in this conversation
+        - explicit conversation context where the doctor ID was provided
 
         Constraints:
         - Do not pass both suggested_doctor_ids and doctor_id
@@ -545,6 +585,17 @@ def register_discovery_tools(mcp: FastMCP) -> None:
             token: AccessToken | None = get_access_token()
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
+
+            if workspace_id == "ekaemr":
+                doctor_availability = await _doctor_availability_elicitation_v2(
+                    suggested_doctor_ids=suggested_doctor_ids,
+                    doctor_id=doctor_id,
+                    hospital_id=hospital_id,
+                    preferred_date=preferred_date,
+                    preferred_slot_time=preferred_slot_time,
+                    ctx=ctx
+                )
+                return doctor_availability
             custom_headers = get_extra_headers()
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
@@ -574,13 +625,98 @@ def register_discovery_tools(mcp: FastMCP) -> None:
                 "error_code": e.error_code
             }
 
+    async def _doctor_availability_elicitation_v2(
+        suggested_doctor_ids: Annotated[Optional[List[str]], "List of suggested doctor ids"] = None,
+        doctor_id: Annotated[Optional[str], "Selected doctor id from suggested_doctor_ids"] = None,
+        hospital_id: Annotated[Optional[str], "Hospital/Clinic/Facility identifier"] = None,
+        preferred_date: Annotated[Optional[str], "Preferred date in YYYY-MM-DD format"] = None,
+        preferred_slot_time: Annotated[Optional[str], "Preferred time slot in HH:MM format"] = None,
+        ctx: Context = CurrentContext()
+    ) -> Dict[str, Any]:
+        """
+        Return doctor availability based on the platform's capabilities.
+        """
+        try:
+            token: AccessToken | None = get_access_token()
+            access_token = token.token if token else None
+            workspace_id = get_workspace_id()
+            custom_headers = get_extra_headers()
+            supports_elicitation = get_supports_elicitation()
+            client = ClientFactory.create_client(
+                workspace_id, access_token, custom_headers
+            )
+            doctor_clinic_service = DoctorClinicService(client)
+            
+            #set default date and slot time if not provided
+            now = datetime.datetime.now()
+            if preferred_date is None or preferred_slot_time is None:
+                today = now.date()
+
+            if preferred_date is None:
+                target_date = now + datetime.timedelta(days=1) if now.hour >= 21 else now
+                preferred_date = target_date.date().isoformat()
+
+            if preferred_slot_time is None and not supports_elicitation:
+                if datetime.date.fromisoformat(preferred_date) == today:
+                    preferred_slot_time = now.strftime("%H:%M")
+                else:
+                    preferred_slot_time = "08:00"
+
+            #check doctor availability
+            doctor_availability = await doctor_clinic_service.doctor_availability_elicitation_v2(
+                suggested_doctor_ids=suggested_doctor_ids,
+                doctor_id=doctor_id,
+                hospital_id=hospital_id,
+                preferred_date=preferred_date,
+                preferred_slot_time=preferred_slot_time,
+            )
+
+            # Single doctor with an already-available date + slot: build the
+            # elicitation success model here (the service only returns the data).
+            if doctor_availability.get("slot_confirmed"):
+                if supports_elicitation:
+                    return build_elicitation_success_response(
+                        doctor_availability["doctor_id"],
+                        doctor_availability["doctor_details"],
+                        doctor_availability["selected_date"],
+                        doctor_availability["selected_slot"],
+                        doctor_availability["clinic_id"],
+                    )
+                return build_plain_availability_response(
+                    doctor_availability["doctor_id"],
+                    {
+                        "hospital_id": doctor_availability["clinic_id"],
+                        "date_preference": doctor_availability["selected_date"],
+                        "slot_preference": doctor_availability["selected_slot"],
+                        "availability": [
+                            {
+                                "date": doctor_availability["selected_date"],
+                                "slots": [doctor_availability["selected_slot"]],
+                            }
+                        ],
+                    },
+                    doctor_availability["doctor_details"],
+                )
+
+            return _build_doctor_availability_response(
+                doctor_availability,
+                supports_elicitation,
+                doctor_id,
+                hospital_id,
+            )
+        except EkaAPIError as e:
+            await ctx.error(f"[doctor_availability_elicitation_v2] Failed: {e.message}\n")
+            return {
+                "error": e.message,
+                "status_code": e.status_code,
+                "error_code": e.error_code
+            }
 
     @mcp.tool(
         title="Check Service Availability",
         tags={"health", "package", "availability", "elicitation"},
         annotations=readonly_tool_annotations()
     )
-
     async def service_availability_elicitation(
         suggested_service_ids: Annotated[Optional[List[str]], "List of suggested service ids"] = None,
         service_id: Annotated[Optional[str], "Selected service id from suggested_service_ids"] = None,

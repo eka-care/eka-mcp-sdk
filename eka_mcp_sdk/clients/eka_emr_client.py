@@ -329,6 +329,54 @@ class EkaEMRClient(BaseEMRClient):
             doctor_id, clinic_id, start_datetime, end_datetime
         )
     
+    async def fetch_single_doctor_availability(
+        self,
+        doctor_id: str,
+        hospital_id: Optional[str] = None,
+        preferred_date: Optional[str] = None,
+        preferred_slot_time: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Fetch availability data for a single selected doctor.
+
+        Returns:
+            {
+                "doctor_id": str,
+                "resolved_clinic_id": Optional[str],
+                "doctor_details": Dict[str, Any],
+                "availability_list": List[Dict[str, Any]],
+                "preferred_date": Optional[str],  # resolved/selected date
+            }
+
+        Raises:
+            EkaAPIError: if the doctor profile cannot be found
+        """
+        doctor_profile = await self.get_doctor_profile(doctor_id)
+        if not doctor_profile or not doctor_profile.get('id'):
+            raise EkaAPIError(f"Doctor with ID '{doctor_id}' not found")
+
+        entities_response = await self.get_business_entities()
+        all_clinics_list = entities_response.get('clinics', [])
+
+        doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
+        doctor_details = build_doctor_details(doctor_profile, doctor_clinics, hospital_id)
+
+        resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id)
+        if not resolved_clinic_id:
+            raise EkaAPIError(f"Clinic with ID '{hospital_id}' not found")
+
+        availability_list, new_preferred_date = await self._fetch_doctor_availability(
+            doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
+        )
+
+        return {
+            "doctor_id": doctor_id,
+            "resolved_clinic_id": resolved_clinic_id,
+            "doctor_details": doctor_details,
+            "availability_list": availability_list,
+            "preferred_date": new_preferred_date or preferred_date,
+        }
+
     async def doctor_availability_elicitation(
         self,
         suggested_doctor_ids: Optional[List[str]] = None,
@@ -372,34 +420,24 @@ class EkaEMRClient(BaseEMRClient):
                 is_doctor_selected = True
                 selected_date = preferred_date
                 selected_slot = preferred_slot_time
-                # Fetch doctor profile
-                doctor_profile = await self.get_doctor_profile(doctor_id)
-                if not doctor_profile or not doctor_profile.get('id'):
-                    return {"error": f"Doctor with ID '{doctor_id}' not found"}
 
-                entities_response = await self.get_business_entities()
-                all_clinics_list = entities_response.get('clinics', [])
+                try:
+                    single_availability = await self.fetch_single_doctor_availability(
+                        doctor_id, hospital_id, preferred_date, preferred_slot_time
+                    )
+                except EkaAPIError as e:
+                    return {"error": str(e)}
 
-                doctor_clinics = find_doctor_clinics(all_clinics_list, doctor_id)
-                selected_doctor_details = build_doctor_details(doctor_profile, doctor_clinics, hospital_id)
-
-                resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
+                selected_doctor_details = single_availability["doctor_details"]
+                resolved_clinic_id = single_availability["resolved_clinic_id"]
+                availability_list = single_availability["availability_list"]
 
                 doctor_entry = {
                     "doctor_id": doctor_id,
                     "hospital_id": resolved_clinic_id,
-                    "preferred_date": selected_date,
-                    "availability": [],
+                    "preferred_date": single_availability["preferred_date"],
+                    "availability": availability_list,
                 }
-
-                availability_list, new_preferred_date = await self._fetch_doctor_availability(
-                    doctor_id, resolved_clinic_id, preferred_date, preferred_slot_time
-                )
-                if availability_list:
-                    doctor_entry["availability"] = availability_list
-                    # is_date_slot_available = True
-                if new_preferred_date:
-                    doctor_entry["preferred_date"] = new_preferred_date
 
                 # User has already selected a slot
                 if selected_date and selected_slot:
