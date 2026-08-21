@@ -388,18 +388,13 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         
         await ctx.info(f"[book_appointment] Booking for patient {booking.patient_id}")
         await ctx.debug(f"Details: date={booking.date}, time={booking.start_time}-{booking.end_time}, mode={booking.mode}")
-
-        meta = ctx.request_context.meta
-        if isinstance(meta, dict):
-            conversation_id = meta.get("conversation_id")
-        else:
-            conversation_id = getattr(meta, "conversation_id", None) if meta is not None else None
         
         try:
             token: AccessToken | None = get_access_token()
             access_token = token.token if token else None
             workspace_id = get_workspace_id()
             custom_headers = get_extra_headers()
+            session_id = custom_headers.get("session-id")
             client = ClientFactory.create_client(
                 workspace_id, access_token, custom_headers
             )
@@ -419,7 +414,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 dob=booking.dob,
                 gender=booking.gender,
                 tag_ids=tag_ids,
-                conversation_id=conversation_id,
+                session_id=session_id,
             )
             
             if result.get("success"):
