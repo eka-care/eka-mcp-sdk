@@ -378,7 +378,8 @@ def register_appointment_tools(mcp: FastMCP) -> None:
             "clinic_id": booking.clinic_id,
             "date": booking.date,
             "start_time": booking.start_time,
-            "end_time": booking.end_time
+            "end_time": booking.end_time,
+            "token": booking.token,
         }
         is_duplicate, cached_response = dedup.check_and_get_cached("book_appointment", **dedup_params)
         
@@ -421,6 +422,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 gender=booking.gender,
                 tag_ids=tag_ids,
                 session_id=session_id,
+                token=booking.token,
             )
             
             if result.get("success"):

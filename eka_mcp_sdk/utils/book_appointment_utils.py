@@ -261,6 +261,9 @@ def build_appointment_data(booking: AppointmentBookingRequest, actual_end_time: 
     
     if booking.reason:
         appointment_data["appointment_details"]["reason"] = booking.reason
+
+    if booking.token is not None:
+        appointment_data["token"] = booking.token
     
     return appointment_data
 
