@@ -79,6 +79,10 @@ class AppointmentBookingRequest(BaseModel):
         max_length=500,
         examples=["Regular checkup", "Follow-up consultation"]
     )
+    token: Optional[int] = Field(
+        None,
+        description="Optional token number for the appointment",
+    )
     
     patient_name: Optional[str] = Field(
         None,

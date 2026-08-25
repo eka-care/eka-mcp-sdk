@@ -615,6 +615,7 @@ class EkaEMRClient(BaseEMRClient):
         gender: Optional[str] = None,
         tag_ids: Optional[List[str]] = None,
         session_id: Optional[str] = None,
+        token: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Smart appointment booking with automatic availability checking and alternate slot suggestions.
@@ -705,6 +706,9 @@ class EkaEMRClient(BaseEMRClient):
 
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
+
+        if token is not None:
+            appointment_data["token"] = token
 
         # Tele-consultation: create a video consultation link via Horus
         vc_link_error = None
