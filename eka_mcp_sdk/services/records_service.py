@@ -5,15 +5,29 @@ medical records (the eka "vault").
 This module provides reusable service classes that can be used both by MCP tools
 and directly by other applications like CrewAI agents.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
+import asyncio
+import ipaddress
 import logging
 import mimetypes
 import os
+import socket
 
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 
 logger = logging.getLogger(__name__)
+
+MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+# Leading "magic" bytes of the file types accepted for URL uploads,
+# mapped to (content_type, file_extension).
+SUPPORTED_FILE_SIGNATURES = {
+    b"%PDF": ("application/pdf", "pdf"),
+    b"\x89PNG\r\n\x1a\n": ("image/png", "png"),
+    b"\xff\xd8\xff": ("image/jpeg", "jpg"),
+}
 
 
 class RecordsService:
@@ -93,15 +107,19 @@ class RecordsService:
     async def upload_patient_record(
         self,
         patient_id: str,
-        file_path: str,
+        file_path: Optional[str] = None,
         title: Optional[str] = None,
         tags: Optional[List[str]] = None,
         document_type: Optional[str] = None,
         document_date: Optional[int] = None,
         cases: Optional[List[str]] = None,
+        file_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Upload a local file as a medical record for a patient.
+        Upload a file as a medical record for a patient.
+
+        The file is downloaded from ``file_url`` when given, otherwise read
+        from ``file_path`` on the local filesystem. At least one is required.
 
         This orchestrates the two-step eka upload flow:
         1. Register the document metadata and obtain a presigned storage URL.
@@ -115,22 +133,22 @@ class RecordsService:
             document_type: Optional document type code (e.g. "lr" for lab report)
             document_date: Optional document reference date as epoch seconds
             cases: Optional list of case identifiers to link the record to
+            file_url: Optional public https URL of a PDF or image (JPEG/PNG), max 5 MB
 
         Returns:
             Summary of the uploaded record including its document_id
 
         Raises:
-            EkaAPIError: If the file is missing or any step of the upload fails
+            EkaAPIError: If no file is given, the file is invalid, or any step of the upload fails
         """
-        if not os.path.isfile(file_path):
-            raise EkaAPIError(f"File not found or not a regular file: {file_path}")
+        if file_url:
+            file_bytes, filename, content_type = await self._download_file(file_url)
+        elif file_path:
+            file_bytes, filename, content_type = self._read_local_file(file_path)
+        else:
+            raise EkaAPIError("Either file_url or file_path must be provided")
 
-        file_size = os.path.getsize(file_path)
-        filename = os.path.basename(file_path)
-        content_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
+        file_size = len(file_bytes)
 
         doc_request: Dict[str, Any] = {
             "files": [{"contentType": content_type, "file_size": file_size}]
@@ -193,3 +211,56 @@ class RecordsService:
             "status": "uploaded",
             "storage_status_code": status_code,
         }
+
+    @staticmethod
+    def _read_local_file(file_path: str) -> Tuple[bytes, str, str]:
+        """Read a local file and return (bytes, filename, content_type)."""
+        if not os.path.isfile(file_path):
+            raise EkaAPIError(f"File not found or not a regular file: {file_path}")
+
+        filename = os.path.basename(file_path)
+        content_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+
+        with open(file_path, "rb") as f:
+            return f.read(), filename, content_type
+
+    async def _download_file(self, file_url: str) -> Tuple[bytes, str, str]:
+        """
+        Download a file from a URL, check it is a PDF or image under 5 MB, and
+        return (bytes, filename, content_type).
+        """
+        await self._ensure_public_https_url(file_url)
+        file_bytes = await self.client.download_file(file_url, MAX_UPLOAD_FILE_SIZE_BYTES)
+
+        for signature, (content_type, extension) in SUPPORTED_FILE_SIGNATURES.items():
+            if file_bytes.startswith(signature):
+                return file_bytes, f"record.{extension}", content_type
+
+        raise EkaAPIError("Unsupported file type; only PDF and images (JPEG, PNG) are allowed")
+
+    @staticmethod
+    async def _ensure_public_https_url(url: str) -> None:
+        """
+        Reject URLs that are not https or that point at private/internal hosts.
+
+        The URL comes from an LLM, so without this check a prompt-injected URL
+        could make the server fetch internal services (SSRF).
+        """
+        try:
+            parsed = urlparse(url)
+            port = parsed.port or 443  # raises ValueError for an invalid port
+        except ValueError:
+            raise EkaAPIError("file_url is not a valid URL")
+
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise EkaAPIError("file_url must be a valid https URL")
+
+        try:
+            addresses = await asyncio.get_running_loop().getaddrinfo(parsed.hostname, port)
+        except socket.gaierror:
+            raise EkaAPIError(f"Could not resolve file_url host: {parsed.hostname}")
+
+        for *_, sockaddr in addresses:
+            ip = ipaddress.ip_address(sockaddr[0].split("%")[0])
+            if not ip.is_global:
+                raise EkaAPIError("file_url must point to a public host")
