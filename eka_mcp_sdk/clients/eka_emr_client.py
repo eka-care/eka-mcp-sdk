@@ -1080,6 +1080,31 @@ class EkaEMRClient(BaseEMRClient):
             )
         return response.status_code
 
+    async def download_file(self, url: str, max_bytes: int) -> bytes:
+        """Download a file from a URL, aborting once it exceeds ``max_bytes``.
+
+        Makes a direct request (bypassing _make_request) so the eka auth
+        headers are never sent to a third-party host. Redirects are not
+        followed, so the caller-validated URL is the only host contacted.
+        """
+        async with self._http_client.stream("GET", url, follow_redirects=False) as response:
+            if response.status_code >= 400:
+                raise EkaAPIError(
+                    message=f"Failed to download file (HTTP {response.status_code})",
+                    status_code=response.status_code,
+                )
+            if response.status_code >= 300:
+                raise EkaAPIError("File URL redirects elsewhere; provide the direct file URL")
+
+            content = bytearray()
+            async for chunk in response.aiter_bytes():
+                content.extend(chunk)
+                if len(content) > max_bytes:
+                    raise EkaAPIError(
+                        f"File exceeds the maximum allowed size of {max_bytes // (1024 * 1024)} MB"
+                    )
+            return bytes(content)
+
     # Service APIs
     async def service_availability_elicitation(
         self,
