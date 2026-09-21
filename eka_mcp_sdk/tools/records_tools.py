@@ -254,9 +254,10 @@ def register_records_tools(mcp: FastMCP) -> None:
         Returns:
             Summary of the uploaded record including its new document_id and status.
         """
-        source = file_url or file_path
+        # Never log file_url: presigned URLs carry credentials in their query string.
+        source = "file_url" if file_url else f"'{file_path}'"
         await ctx.info(
-            f"[upload_patient_record] Uploading '{source}' for patient: {patient_id}"
+            f"[upload_patient_record] Uploading {source} for patient: {patient_id}"
         )
 
         try:

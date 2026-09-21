@@ -246,14 +246,17 @@ class RecordsService:
         The URL comes from an LLM, so without this check a prompt-injected URL
         could make the server fetch internal services (SSRF).
         """
-        parsed = urlparse(url)
+        try:
+            parsed = urlparse(url)
+            port = parsed.port or 443  # raises ValueError for an invalid port
+        except ValueError:
+            raise EkaAPIError("file_url is not a valid URL")
+
         if parsed.scheme != "https" or not parsed.hostname:
             raise EkaAPIError("file_url must be a valid https URL")
 
         try:
-            addresses = await asyncio.get_running_loop().getaddrinfo(
-                parsed.hostname, parsed.port or 443
-            )
+            addresses = await asyncio.get_running_loop().getaddrinfo(parsed.hostname, port)
         except socket.gaierror:
             raise EkaAPIError(f"Could not resolve file_url host: {parsed.hostname}")
 

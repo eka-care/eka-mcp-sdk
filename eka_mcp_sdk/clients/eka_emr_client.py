@@ -1,7 +1,10 @@
 from eka_mcp_sdk import EkaAPIError
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
+import asyncio
 import logging
+
+import httpx
 
 # Horus is an optional dependency (install with the "tele" extra); tele-consultation
 # links are skipped when it is not installed.
@@ -1080,13 +1083,29 @@ class EkaEMRClient(BaseEMRClient):
             )
         return response.status_code
 
-    async def download_file(self, url: str, max_bytes: int) -> bytes:
+    async def download_file(
+        self, url: str, max_bytes: int, timeout_seconds: float = 10.0
+    ) -> bytes:
         """Download a file from a URL, aborting once it exceeds ``max_bytes``.
 
         Makes a direct request (bypassing _make_request) so the eka auth
         headers are never sent to a third-party host. Redirects are not
         followed, so the caller-validated URL is the only host contacted.
+
+        Raises:
+            EkaAPIError: On HTTP errors, redirects, oversized files, network
+                errors, or if the whole download takes longer than ``timeout_seconds``.
         """
+        try:
+            return await asyncio.wait_for(
+                self._stream_download(url, max_bytes), timeout=timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise EkaAPIError(f"File download timed out after {timeout_seconds:g} seconds")
+        except httpx.HTTPError as e:
+            raise EkaAPIError(f"Network error while downloading file: {type(e).__name__}")
+
+    async def _stream_download(self, url: str, max_bytes: int) -> bytes:
         async with self._http_client.stream("GET", url, follow_redirects=False) as response:
             if response.status_code >= 400:
                 raise EkaAPIError(

@@ -5,6 +5,7 @@ import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from eka_mcp_sdk.auth.models import EkaAPIError
@@ -191,6 +192,8 @@ def test_upload_patient_record_rejects_unsupported_file_type():
         "https://169.254.169.254/latest/meta-data",  # cloud metadata endpoint
         "https://10.0.0.5/report.pdf",  # private network
         "not a url",
+        "https://93.184.216.34:99999/report.pdf",  # invalid port
+        "https://[::1/report.pdf",  # malformed IPv6 host
     ],
 )
 def test_upload_patient_record_rejects_unsafe_file_url(file_url):
@@ -210,3 +213,52 @@ def test_upload_patient_record_requires_file_url_or_file_path():
         asyncio.run(RecordsService(client).upload_patient_record("oid-1"))
 
     client.initiate_medical_record_upload.assert_not_called()
+
+
+def _client_with_transport(handler):
+    client = EkaEMRClient(access_token="token")
+    client._http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return client
+
+
+def test_download_file_returns_content():
+    client = _client_with_transport(lambda request: httpx.Response(200, content=b"%PDF ok"))
+
+    assert asyncio.run(client.download_file("https://files/report", 1024)) == b"%PDF ok"
+
+
+def test_download_file_rejects_oversized_file():
+    client = _client_with_transport(lambda request: httpx.Response(200, content=b"x" * 2048))
+
+    with pytest.raises(EkaAPIError, match="maximum allowed size"):
+        asyncio.run(client.download_file("https://files/report", 1024))
+
+
+def test_download_file_does_not_follow_redirects():
+    client = _client_with_transport(
+        lambda request: httpx.Response(302, headers={"location": "https://10.0.0.1/"})
+    )
+
+    with pytest.raises(EkaAPIError, match="redirects"):
+        asyncio.run(client.download_file("https://files/report", 1024))
+
+
+def test_download_file_times_out():
+    async def slow_handler(request):
+        await asyncio.sleep(1)
+        return httpx.Response(200, content=b"%PDF late")
+
+    client = _client_with_transport(slow_handler)
+
+    with pytest.raises(EkaAPIError, match="timed out"):
+        asyncio.run(client.download_file("https://files/report", 1024, timeout_seconds=0.1))
+
+
+def test_download_file_wraps_network_errors():
+    def failing_handler(request):
+        raise httpx.ConnectError("connection refused", request=request)
+
+    client = _client_with_transport(failing_handler)
+
+    with pytest.raises(EkaAPIError, match="Network error"):
+        asyncio.run(client.download_file("https://files/report", 1024))
