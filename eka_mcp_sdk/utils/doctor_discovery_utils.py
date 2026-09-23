@@ -6,51 +6,49 @@ and fetching availability in the doctor_card component format.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
 def find_doctor_clinics(
-    clinics_list: List[Dict[str, Any]],
-    doctor_id: str
-) -> List[Dict[str, Any]]:
+    clinics_list: list[dict[str, Any]], doctor_id: str
+) -> list[dict[str, Any]]:
     """
     Find all clinics associated with a doctor.
-    
+
     Note: In the API, clinics contain doctor IDs (not the reverse).
     clinics: [{ clinic_id: "...", doctors: ["do123", ...], name: "..." }]
     """
     doctor_clinics = []
     for clinic in clinics_list:
-        doctor_ids = clinic.get('doctors', [])
+        doctor_ids = clinic.get("doctors", [])
         if doctor_id in doctor_ids:
             doctor_clinics.append(clinic)
     return doctor_clinics
 
 
 def resolve_hospital_id(
-    doctor_clinics: List[Dict[str, Any]],
-    hospital_id: Optional[str]
-) -> Optional[str]:
+    doctor_clinics: list[dict[str, Any]], hospital_id: str | None
+) -> str | None:
     """Resolve hospital ID - validate provided one or use first available."""
     if hospital_id:
         for clinic in doctor_clinics:
-            clinic_id = clinic.get('clinic_id') or clinic.get('id')
+            clinic_id = clinic.get("clinic_id") or clinic.get("id")
             if clinic_id == hospital_id:
                 return hospital_id
     # Fall back to first clinic
     if doctor_clinics:
-        return doctor_clinics[0].get('clinic_id') or doctor_clinics[0].get('id')
+        return doctor_clinics[0].get("clinic_id") or doctor_clinics[0].get("id")
     return None
 
 
 def parse_slots_to_date_map(
-    slots_result: Dict[str, Any],
-    hospital_id: str
-) -> Dict[str, List[str]]:
+    slots_result: dict[str, Any], hospital_id: str
+) -> dict[str, list[str]]:
     """
     Parse slot results into a date -> slots map.
-    
+
     Works with common format from client:
     {
         "dates": [
@@ -60,15 +58,16 @@ def parse_slots_to_date_map(
         ...
     }
     """
-    date_slots_map: Dict[str, List[str]] = {}
-    
-    for day in slots_result.get('dates', []):
-        day_date = day.get('date', '')
-        all_slots = day.get('all_slots', [])
+    date_slots_map: dict[str, list[str]] = {}
+
+    for day in slots_result.get("dates", []):
+        day_date = day.get("date", "")
+        all_slots = day.get("all_slots", [])
         if day_date and all_slots:
             date_slots_map[day_date] = all_slots
-    
+
     return date_slots_map
+
 
 def build_elicitation_success_response(
     entity_id,
@@ -77,7 +76,7 @@ def build_elicitation_success_response(
     selected_slot,
     clinic_id,
     selected_slot_id=None,
-    entity_type="doctor"
+    entity_type="doctor",
 ):
     res = {
         "component": "doctor_card",
@@ -86,16 +85,24 @@ def build_elicitation_success_response(
         "_meta": {
             "disp_message": "I would like to schedule a booking on %s at %s for %s",
             "disp_toast_msg": "Selected %s slot on %s for %s",
-            "tool_result": {}
+            "tool_result": {},
         },
-        "status": "success"
+        "status": "success",
     }
     entity_name = entity_details.get("name") or ""
     if entity_type == "doctor":
         if not entity_name.lower().startswith("dr."):
             entity_name = "Dr. " + entity_name
-    res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (selected_date, selected_slot, entity_name)
-    res["_meta"]["disp_toast_msg"] = res["_meta"]["disp_toast_msg"] % (selected_slot, selected_date, entity_name)
+    res["_meta"]["disp_message"] = res["_meta"]["disp_message"] % (
+        selected_date,
+        selected_slot,
+        entity_name,
+    )
+    res["_meta"]["disp_toast_msg"] = res["_meta"]["disp_toast_msg"] % (
+        selected_slot,
+        selected_date,
+        entity_name,
+    )
     selected_hospital = None
     for h in entity_details.get("hospitals"):
         if (h.get("hospital_id") or h.get("location_id") or "") == clinic_id:
@@ -104,8 +111,8 @@ def build_elicitation_success_response(
     entity_name = entity_details.get("name")
     res["_meta"]["tool_result"] = {
         "selected_hospital_details": selected_hospital,
-        "selected_slot":selected_slot,
-        "selected_date":selected_date,
+        "selected_slot": selected_slot,
+        "selected_date": selected_date,
         "result": "This date and slot is available for booking. No further elicitation needed.",
     }
     if entity_type == "doctor":
@@ -118,14 +125,15 @@ def build_elicitation_success_response(
         res["_meta"]["tool_result"]["selected_slot_id"] = selected_slot_id
     return res
 
+
 def build_elicitation_response(
-    entity_entries: List[Any],
-    entity_details: Dict[str, Any],
+    entity_entries: list[Any],
+    entity_details: dict[str, Any],
     is_entity_selected: bool,
-    entity_id: Optional[str] = None,
-    hospital_id: Optional[str] = None,
-    entity_type: Optional[str] = "doctor"
-) -> Dict[str, Any]:
+    entity_id: str | None = None,
+    hospital_id: str | None = None,
+    entity_type: str | None = "doctor",
+) -> dict[str, Any]:
     """
     Build the UI contract response for doctor availability elicitation.
     """
@@ -136,8 +144,8 @@ def build_elicitation_response(
             "properties": {
                 "preferred_date": {
                     "type": "string",
-                    "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$",
-                    "description": "Enter the date to get slots for."
+                    "pattern": r"^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})$",
+                    "description": "Enter the date to get slots for.",
                 },
                 "preferred_slot_time": {
                     "type": "string",
@@ -146,11 +154,13 @@ def build_elicitation_response(
                 "hospital_id": {
                     "type": "string",
                     "description": "Hospital's identifier",
-                }
+                },
             },
             "required": [
-                "hospital_id", "preferred_date", "preferred_slot_time",
-            ]
+                "hospital_id",
+                "preferred_date",
+                "preferred_slot_time",
+            ],
         }
     }
     if entity_type == "doctor":
@@ -169,22 +179,16 @@ def build_elicitation_response(
         "status": status,
         "is_elicitation": True,
         "component": "doctor_card",
-        "input": {
-            "doctors": entity_entries,
-            "doctor_details": entity_details
-        }
+        "input": {"doctors": entity_entries, "doctor_details": entity_details},
     }
     if meta:
         resp["_meta"] = meta
     return resp
 
 
-
 def build_plain_availability_response(
-    doctor_id: str,
-    doctor_entry: Dict[str, Any],
-    doctor_details: Dict[str, Any]
-) -> Dict[str, Any]:
+    doctor_id: str, doctor_entry: dict[str, Any], doctor_details: dict[str, Any]
+) -> dict[str, Any]:
     """
     Build plain availability response without the doctor_card UI component.
     Used for headless clients (whatsapp, telephone, voice mode).
@@ -197,33 +201,75 @@ def build_plain_availability_response(
         "availability": doctor_entry.get("availability", []),
         "date_preference": doctor_entry.get("date_preference"),
         "slot_preference": doctor_entry.get("slot_preference"),
-        "is_elicitation_needed": False
+        "is_elicitation_needed": False,
     }
 
 
-def _extract_clinic_address(clinic: Dict[str, Any]) -> Dict[str, str]:
+def build_plain_availability_from_entries(
+    doctor_entries: list[dict[str, Any]],
+    doctor_details_by_id: dict[str, Any],
+    doctor_id: str | None = None,
+    preferred_date: str | None = None,
+    preferred_slot_time: str | None = None,
+) -> dict[str, Any]:
+    """Headless availability for the doctors already collected by elicitation.
+
+    One doctor returns the flat plain-availability dict. Several doctors
+    return {"is_elicitation_needed": False, "doctors": [...]}.
+    """
+    entries = doctor_entries or [{}]
+    responses = []
+    for entry in entries:
+        resolved_id = entry.get("doctor_id") or doctor_id
+        details = doctor_details_by_id.get(resolved_id) if resolved_id else None
+        if not isinstance(details, dict):
+            details = (
+                next(iter(doctor_details_by_id.values()))
+                if len(doctor_details_by_id) == 1
+                else {}
+            )
+        responses.append(
+            build_plain_availability_response(
+                resolved_id or "",
+                {
+                    **entry,
+                    "date_preference": entry.get("date_preference")
+                    or entry.get("preferred_date")
+                    or preferred_date,
+                    "slot_preference": entry.get("slot_preference")
+                    or preferred_slot_time,
+                },
+                details if isinstance(details, dict) else {},
+            )
+        )
+    if len(responses) == 1:
+        return responses[0]
+    return {"is_elicitation_needed": False, "doctors": responses}
+
+
+def _extract_clinic_address(clinic: dict[str, Any]) -> dict[str, str]:
     """Extract address fields from clinic, handling nested address structure."""
     # Try direct fields first
-    city = clinic.get('city', '')
-    state = clinic.get('state', '')
-    
+    city = clinic.get("city", "")
+    state = clinic.get("state", "")
+
     # Try nested address structure (from doctor profile's clinics)
-    address = clinic.get('address', {})
+    address = clinic.get("address", {})
     if address:
-        city = city or address.get('city', '')
-        state = state or address.get('state', '')
-    
-    return {'city': city, 'state': state}
+        city = city or address.get("city", "")
+        state = state or address.get("state", "")
+
+    return {"city": city, "state": state}
 
 
 def build_doctor_details(
-    doctor_profile: Dict[str, Any],
-    doctor_clinics: List[Dict[str, Any]],
-    hospital_id: str = ""
-) -> Dict[str, Any]:
+    doctor_profile: dict[str, Any],
+    doctor_clinics: list[dict[str, Any]],
+    hospital_id: str = "",
+) -> dict[str, Any]:
     """
     Build doctor details in UI contract format.
-    
+
     doctor_profile structure (from client - already in common format):
     {
         "id": "do...",
@@ -234,65 +280,81 @@ def build_doctor_details(
         "languages": "Hindi, English"..,
         "clinics": [{"clinic_id": "...", "name": "...", "address": {...}}]
     }
-    
+
     doctor_clinics structure (from business entities):
     [{ "clinic_id": "c-...", "name": "...", "doctors": [...] }]
     """
     # Use doctor_clinics from business entities, fallback to profile clinics
-    clinics_to_use = doctor_clinics if doctor_clinics else doctor_profile.get('clinics', [])
-    
+    clinics_to_use = (
+        doctor_clinics if doctor_clinics else doctor_profile.get("clinics", [])
+    )
+
     selected_hospital = []
     non_selected_hospitals = []
     for c in clinics_to_use:
         addr = _extract_clinic_address(c)
-        current_hospital_id = c.get('clinic_id') or c.get('id', '')
+        current_hospital_id = c.get("clinic_id") or c.get("id", "")
         if current_hospital_id == hospital_id:
-            selected_hospital.append({
-                "hospital_id": current_hospital_id,
-                "name": c.get('name', ''),
-                "city": addr['city'],
-                "state": addr['state'],
-                "region_id": c.get('region_id', '')
-            })
+            selected_hospital.append(
+                {
+                    "hospital_id": current_hospital_id,
+                    "name": c.get("name", ""),
+                    "city": addr["city"],
+                    "state": addr["state"],
+                    "region_id": c.get("region_id", ""),
+                }
+            )
         else:
-            non_selected_hospitals.append({
-                "hospital_id": current_hospital_id,
-                "name": c.get('name', ''),
-                "city": addr['city'],
-                "state": addr['state'],
-                "region_id": c.get('region_id', '')
-            })
-    
-    hospitals = selected_hospital + non_selected_hospitals  # to show selected hospital first
-    specialties = doctor_profile.get('specialties', [])
-    specialty = ", ".join(
-        s.get('name', '') if isinstance(s, dict) else s for s in specialties
-    ) if specialties else doctor_profile.get('specialty', '')
+            non_selected_hospitals.append(
+                {
+                    "hospital_id": current_hospital_id,
+                    "name": c.get("name", ""),
+                    "city": addr["city"],
+                    "state": addr["state"],
+                    "region_id": c.get("region_id", ""),
+                }
+            )
 
-    details: Dict[str, Any] = {
-        "name": doctor_profile.get('name', ''),
+    hospitals = (
+        selected_hospital + non_selected_hospitals
+    )  # to show selected hospital first
+    specialties = doctor_profile.get("specialties", [])
+    specialty = (
+        ", ".join(s.get("name", "") if isinstance(s, dict) else s for s in specialties)
+        if specialties
+        else doctor_profile.get("specialty", "")
+    )
+
+    details: dict[str, Any] = {
+        "name": doctor_profile.get("name", ""),
         "specialty": specialty,
-        "hospitals": hospitals
+        "hospitals": hospitals,
     }
-    
+
     # Add optional fields from common format
-    if doctor_profile.get('profile_pic'):
-        details["profile_pic"] = doctor_profile['profile_pic']
-    
-    if doctor_profile.get('languages'):
-        langs = doctor_profile['languages']
-        details["languages"] = ", ".join(
-            lang.get('value', lang.get('name', '')) if isinstance(lang, dict) else lang
-            for lang in langs
-        ) if isinstance(langs, list) else langs
-    
-    if doctor_profile.get('experience'):
-        details["experience"] = str(doctor_profile['experience'])
-    
-    if doctor_profile.get('timings'):
-        details["timings"] = doctor_profile['timings']
-    
-    if doctor_profile.get('profile_link'):
-        details["profile_link"] = doctor_profile['profile_link']
-    
+    if doctor_profile.get("profile_pic"):
+        details["profile_pic"] = doctor_profile["profile_pic"]
+
+    if doctor_profile.get("languages"):
+        langs = doctor_profile["languages"]
+        details["languages"] = (
+            ", ".join(
+                lang.get("value", lang.get("name", ""))
+                if isinstance(lang, dict)
+                else lang
+                for lang in langs
+            )
+            if isinstance(langs, list)
+            else langs
+        )
+
+    if doctor_profile.get("experience"):
+        details["experience"] = str(doctor_profile["experience"])
+
+    if doctor_profile.get("timings"):
+        details["timings"] = doctor_profile["timings"]
+
+    if doctor_profile.get("profile_link"):
+        details["profile_link"] = doctor_profile["profile_link"]
+
     return details
