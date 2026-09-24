@@ -1,6 +1,26 @@
-*.pyc
 __pycache__/
-*.swp
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# --- Virtual Environments (uv, pipenv, venv) ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- FastMCP & Local Environment Secrets ---
 .env
+.env.local
+.env.*.local
+*.log
+
+# --- IDEs and Tools ---
+.vscode/
+.idea/
+.cursor/
+
+# --- OS Generated Files ---
 .DS_Store
-.idea
+Thumbs.db

@@ -10,9 +10,17 @@ import logging
 from ..clients.eka_emr_client import EkaEMRClient
 from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
+    get_cached_data,
+    extract_patient_summary,
+    extract_doctor_summary,
+)
+from ..utils.doctor_discovery_utils import find_doctor_clinics, resolve_hospital_id, build_doctor_details
+from typing import Union
+from .models import (
+    DayAvailability,
+    DoctorAvailability,
+    DoctorAvailabilityV2Response,
+    ConfirmedSlotResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,6 +122,147 @@ class DoctorClinicService:
             preferred_slot_time=preferred_slot_time,
             supports_elicitation=supports_elicitation,
             meta=meta
+        )
+
+    async def doctor_availability_elicitation_v2(
+        self,
+        suggested_doctor_ids: Optional[List[str]] = None,
+        doctor_id: Optional[str] = None,
+        hospital_id: Optional[str] = None,
+        preferred_date: Optional[str] = None,
+        preferred_slot_time: Optional[str] = None,
+        meta: Optional[Dict[Any, Any]] = None
+    ) -> Union[DoctorAvailabilityV2Response, ConfirmedSlotResponse]:
+        """
+        Return doctor availability based on the contract format.
+
+        For a single selected doctor whose preferred date + slot are already
+        available, this returns a ConfirmedSlotResponse carrying the raw data.
+        It intentionally does NOT build the elicitation success model; the
+        calling tool is responsible for that.
+        """
+        doctors_payload: List[DoctorAvailability] = []
+
+        if doctor_id:
+            # single doctor is selected -> reuse the shared availability fetch
+            try:
+                single_availability = await self.client.fetch_single_doctor_availability(
+                    doctor_id, hospital_id, preferred_date, preferred_slot_time
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not fetch v2 availability for doctor %s: %s",
+                    doctor_id,
+                    str(e),
+                )
+                return DoctorAvailabilityV2Response(
+                    doctors=[
+                        DoctorAvailability(
+                            doctor_id=doctor_id,
+                            hospital_id=hospital_id,
+                            preferred_date=preferred_date,
+                            availability=[],
+                        )
+                    ],
+                    doctor_details={},
+                )
+
+            availability_list = single_availability["availability_list"]
+
+            # User has already selected a date + slot and it is available:
+            # signal confirmation and let the tool build the elicitation model.
+            if preferred_date and preferred_slot_time and self.client._is_slot_available(
+                availability_list, preferred_date, preferred_slot_time
+            ):
+                return ConfirmedSlotResponse(
+                    slot_confirmed=True,
+                    doctor_id=doctor_id,
+                    doctor_details=single_availability["doctor_details"],
+                    clinic_id=single_availability["resolved_clinic_id"],
+                    selected_date=preferred_date,
+                    selected_slot=preferred_slot_time,
+                )
+
+            return DoctorAvailabilityV2Response(
+                doctors=[
+                    DoctorAvailability(
+                        doctor_id=doctor_id,
+                        hospital_id=single_availability["resolved_clinic_id"],
+                        preferred_date=single_availability["preferred_date"],
+                        availability=[
+                            DayAvailability(date=day["date"], slots=day["slots"])
+                            for day in availability_list
+                        ],
+                    )
+                ],
+                doctor_details={doctor_id: single_availability["doctor_details"]},
+            )
+
+        if not suggested_doctor_ids:
+            raise EkaAPIError("Invalid request: either suggested_doctor_ids or doctor_id is required")
+
+        doctor_ids: List[str] = [d for d in suggested_doctor_ids if d]
+
+        doctor_details: Dict[str, Any] = {}
+        entities_response = await self.client.get_business_entities()
+        all_clinics_list = entities_response.get("clinics", [])
+
+        for current_doctor_id in doctor_ids:
+            try:
+                doctor_clinics = find_doctor_clinics(all_clinics_list, current_doctor_id)
+                resolved_clinic_id = resolve_hospital_id(doctor_clinics, hospital_id) or hospital_id
+                profile = await self.client.get_doctor_profile(current_doctor_id)
+                doctor_details[current_doctor_id] = build_doctor_details(
+                    profile, doctor_clinics, hospital_id or ""
+                )
+
+                if not resolved_clinic_id:
+                    doctors_payload.append(
+                        DoctorAvailability(
+                            doctor_id=current_doctor_id,
+                            hospital_id=hospital_id,
+                            preferred_date=preferred_date,
+                            availability=[],
+                        )
+                    )
+                    continue
+
+                availability_list, new_preferred_date = await self.client._fetch_doctor_availability(
+                    current_doctor_id,
+                    resolved_clinic_id,
+                    preferred_date,
+                    preferred_slot_time,
+                )
+
+                doctors_payload.append(
+                    DoctorAvailability(
+                        doctor_id=current_doctor_id,
+                        hospital_id=resolved_clinic_id,
+                        preferred_date=new_preferred_date or preferred_date,
+                        availability=[
+                            DayAvailability(date=day["date"], slots=day["slots"])
+                            for day in availability_list
+                        ],
+                    )
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not fetch v2 availability for doctor %s: %s",
+                    current_doctor_id,
+                    str(e),
+                )
+                doctors_payload.append(
+                    DoctorAvailability(
+                        doctor_id=current_doctor_id,
+                        hospital_id=hospital_id,
+                        preferred_date=preferred_date,
+                        availability=[],
+                    )
+                )
+
+        return DoctorAvailabilityV2Response(
+            doctors=doctors_payload,
+            doctor_details=doctor_details,
         )
 
     async def service_availability_elicitation(

@@ -35,7 +35,7 @@ class ClientFactory:
         Create an EMR client for the specified workspace.
         
         Args:
-            workspace_id: The workspace identifier (e.g., 'moolchand', 'ekaemr')
+            workspace_id: The workspace identifier
             access_token: Optional access token for authenticated requests
             custom_headers: Optional custom headers to include in requests
             
