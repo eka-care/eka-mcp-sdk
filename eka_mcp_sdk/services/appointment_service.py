@@ -4,16 +4,17 @@ Appointment service module containing core business logic for appointment manage
 This module provides reusable service classes that can be used both by MCP tools
 and directly by other applications like CrewAI agents.
 """
-from typing import Any, Dict, Optional, List
+
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from ..clients.eka_emr_client import EkaEMRClient
-from ..auth.models import EkaAPIError
 from ..utils.enrichment_helpers import (
-    get_cached_data, 
-    extract_patient_summary, 
-    extract_doctor_summary, 
-    extract_clinic_summary
+    extract_clinic_summary,
+    extract_doctor_summary,
+    extract_patient_summary,
+    get_cached_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,34 +22,30 @@ logger = logging.getLogger(__name__)
 
 class AppointmentService:
     """Core service for appointment management operations."""
-    
+
     def __init__(self, client: EkaEMRClient):
         """
         Initialize the appointment service.
-        
+
         Args:
             client: EkaEMRClient instance for API calls
         """
         self.client = client
-    
+
     async def get_appointment_slots(
-        self,
-        doctor_id: str,
-        clinic_id: str,
-        start_date: str,
-        end_date: str
-    ) -> Dict[str, Any]:
+        self, doctor_id: str, clinic_id: str, start_date: str, end_date: str
+    ) -> dict[str, Any]:
         """
         Get available appointment slots for a doctor at a specific clinic within a date range.
-        
+
         Note: API only supports date range of D to D+1.
-        
+
         Args:
             doctor_id: Doctor's unique identifier
             clinic_id: Clinic's unique identifier
             start_date: Start date for appointment slots (YYYY-MM-DD format)
             end_date: End date for appointment slots (YYYY-MM-DD format, must be start_date + 1 day)
-            
+
         Returns:
             Available appointment slots in common contract format:
             {
@@ -66,79 +63,78 @@ class AppointmentService:
                 "pricing": {...},
                 "metadata": {}
             }
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_appointment_slots(doctor_id, clinic_id, start_date, end_date)
-    
+        return await self.client.get_appointment_slots(
+            doctor_id, clinic_id, start_date, end_date
+        )
+
     async def get_available_dates(
-        self,
-        doctor_id: str,
-        clinic_id: str,
-        start_date: str,
-        end_date: str
-    ) -> Dict[str, Any]:
+        self, doctor_id: str, clinic_id: str, start_date: str, end_date: str
+    ) -> dict[str, Any]:
         """
         Get available appointment dates for a doctor at a specific clinic within a date range.
-        
+
         Args:
             doctor_id: Doctor's unique identifier
             clinic_id: Clinic's unique identifier
             start_date: Start date (YYYY-MM-DD or ISO format)
             end_date: End date (YYYY-MM-DD or ISO format)
-            
+
         Returns:
             Available dates in common contract format:
             {
                 "available_dates": ["YYYY-MM-DD", ...],
                 "date_range": {"start": "...", "end": "..."}
             }
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_available_dates(doctor_id, clinic_id, start_date, end_date)
-    
+        return await self.client.get_available_dates(
+            doctor_id, clinic_id, start_date, end_date
+        )
+
     async def get_available_slots(
-        self,
-        doctor_id: str,
-        clinic_id: str,
-        date: str
-    ) -> Dict[str, Any]:
+        self, doctor_id: str, clinic_id: str, date: str
+    ) -> dict[str, Any]:
         """
         Get available slots for a specific date.
-        
+
         Convenience method for single-day slot lookup.
-        
+
         Args:
             doctor_id: Doctor's unique identifier
             clinic_id: Clinic's unique identifier
             date: Date in YYYY-MM-DD format
-            
+
         Returns:
             Available slots in common contract format
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.get_available_slots(doctor_id, clinic_id, date)
-    
-    async def book_appointment(self, appointment_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def book_appointment(
+        self, appointment_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Book an appointment slot for a patient (raw API call).
-        
+
         Args:
             appointment_data: Appointment details including patient, doctor, timing, and mode
-            
+
         Returns:
             Booked appointment details with confirmation
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.book_appointment(appointment_data)
-    
+
     async def book_appointment_with_validation(
         self,
         patient_id: str,
@@ -148,19 +144,19 @@ class AppointmentService:
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None,
-        patient_name: Optional[str] = None,
-        dob: Optional[str] = None,
-        gender: Optional[str] = None,
-        tag_ids: Optional[List[str]] = None,
-        session_id: Optional[str] = None,
-        token: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        reason: str | None = None,
+        patient_name: str | None = None,
+        dob: str | None = None,
+        gender: str | None = None,
+        tag_ids: list[str] | None = None,
+        session_id: str | None = None,
+        token: int | None = None,
+    ) -> dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
-        
+
         Delegates to client which handles the orchestration logic.
-        
+
         Returns:
             - If slot available: {"success": True, "data": {...}, "booked_slot": {...}}
             - If slot unavailable: {"success": False, "slot_unavailable": True, "alternate_slots": [...]}
@@ -181,20 +177,20 @@ class AppointmentService:
             session_id=session_id,
             token=token,
         )
-    
+
     async def doctor_availability_elicitation(
         self,
         doctor_id: str,
-        clinic_id: Optional[str] = None,
-        preferred_date: Optional[str] = None,
-        preferred_slot_time: Optional[str] = None,
-        meta: Optional[Dict[Any, Any]] = None,
-    ) -> Dict[str, Any]:
+        clinic_id: str | None = None,
+        preferred_date: str | None = None,
+        preferred_slot_time: str | None = None,
+        meta: dict[Any, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.
-        
+
         Delegates to client which handles the orchestration logic.
-        
+
         Returns:
             UI contract with doctor_card component, availability, and callbacks
         """
@@ -204,18 +200,18 @@ class AppointmentService:
 
     async def show_appointments_enriched(
         self,
-        doctor_id: Optional[str] = None,
-        clinic_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        page_no: int = 0
-    ) -> Dict[str, Any]:
+        doctor_id: str | None = None,
+        clinic_id: str | None = None,
+        patient_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        page_no: int = 0,
+    ) -> dict[str, Any]:
         """
         Get appointments with comprehensive details including patient names, doctor profiles, and clinic information.
-        
+
         This method provides complete context without requiring additional API calls.
-        
+
         Args:
             doctor_id: Filter by doctor ID (optional)
             clinic_id: Filter by clinic ID (optional)
@@ -223,10 +219,10 @@ class AppointmentService:
             start_date: Start date filter (YYYY-MM-DD format, optional)
             end_date: End date filter (YYYY-MM-DD format, optional)
             page_no: Page number for pagination (starts from 0)
-            
+
         Returns:
             Enriched appointments with patient names, doctor details, and clinic information
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
@@ -237,26 +233,26 @@ class AppointmentService:
             patient_id=patient_id,
             start_date=start_date,
             end_date=end_date,
-            page_no=page_no
+            page_no=page_no,
         )
-        
+
         # Enrich with additional details
         enriched_result = await self._enrich_appointments_data(appointments_result)
-        
+
         return enriched_result
-    
+
     async def show_appointments_basic(
         self,
-        doctor_id: Optional[str] = None,
-        clinic_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        page_no: int = 0
-    ) -> Dict[str, Any]:
+        doctor_id: str | None = None,
+        clinic_id: str | None = None,
+        patient_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        page_no: int = 0,
+    ) -> dict[str, Any]:
         """
         Get basic appointments data (IDs only).
-        
+
         Args:
             doctor_id: Filter by doctor ID (optional)
             clinic_id: Filter by clinic ID (optional)
@@ -264,10 +260,10 @@ class AppointmentService:
             start_date: Start date filter (YYYY-MM-DD format, optional)
             end_date: End date filter (YYYY-MM-DD format, optional)
             page_no: Page number for pagination (starts from 0)
-            
+
         Returns:
             Basic appointments with entity IDs only
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
@@ -277,204 +273,211 @@ class AppointmentService:
             patient_id=patient_id,
             start_date=start_date,
             end_date=end_date,
-            page_no=page_no
+            page_no=page_no,
         )
-    
+
     async def get_appointment_details_enriched(
-        self,
-        appointment_id: str,
-        partner_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, appointment_id: str, partner_id: str | None = None
+    ) -> dict[str, Any]:
         """
         Get comprehensive appointment details with complete patient, doctor, and clinic information.
-        
+
         This method provides complete context without requiring additional API calls.
-        
+
         Args:
             appointment_id: Appointment's unique identifier
             partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-            
+
         Returns:
             Complete appointment details with enriched patient, doctor, and clinic information
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         # Get basic appointment details
-        appointment_result = await self.client.get_appointment_details(appointment_id, partner_id)
-        
+        appointment_result = await self.client.get_appointment_details(
+            appointment_id, partner_id
+        )
+
         # Enrich with additional details (treat as single-item list)
-        enriched_result = await self._enrich_appointments_data({"appointments": [appointment_result]})
-        
+        enriched_result = await self._enrich_appointments_data(
+            {"appointments": [appointment_result]}
+        )
+
         # Return the single enriched appointment
-        enriched_appointment = enriched_result.get("appointments", [{}])[0] if enriched_result.get("appointments") else appointment_result
-        
+        enriched_appointment = (
+            enriched_result.get("appointments", [{}])[0]
+            if enriched_result.get("appointments")
+            else appointment_result
+        )
+
         return enriched_appointment
-    
+
     async def get_appointment_details_basic(
-        self,
-        appointment_id: str,
-        partner_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, appointment_id: str, partner_id: str | None = None
+    ) -> dict[str, Any]:
         """
         Get basic appointment details (IDs only).
-        
+
         Args:
             appointment_id: Appointment's unique identifier
             partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-            
+
         Returns:
             Basic appointment details with entity IDs only
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.get_appointment_details(appointment_id, partner_id)
-    
+
     async def get_patient_appointments_enriched(
         self,
         patient_id: str,
-        limit: Optional[int] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+        limit: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """
         Get all appointments for a specific patient with enriched doctor and clinic details.
-        
+
         This method provides complete context without requiring additional API calls.
-        
+
         Args:
             patient_id: Patient's unique identifier
             limit: Maximum number of appointments to return
             start_date: Start date filter (YYYY-MM-DD format, optional)
             end_date: End date filter (YYYY-MM-DD format, optional)
-            
+
         Returns:
             List of enriched appointments for the patient with doctor and clinic information
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         # Get basic appointments
-        appointments_result = await self.client.get_patient_appointments(patient_id, limit, start_date, end_date)
-        
+        appointments_result = await self.client.get_patient_appointments(
+            patient_id, limit, start_date, end_date
+        )
+
         # Enrich with additional details
         enriched_result = await self._enrich_appointments_data(appointments_result)
-        
+
         return enriched_result
-    
+
     async def get_patient_appointments_basic(
         self,
         patient_id: str,
-        limit: Optional[int] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+        limit: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """
         Get basic appointments for a specific patient (IDs only).
-        
+
         Args:
             patient_id: Patient's unique identifier
             limit: Maximum number of appointments to return
             start_date: Start date filter (YYYY-MM-DD format, optional)
             end_date: End date filter (YYYY-MM-DD format, optional)
-            
+
         Returns:
             Basic appointments with entity IDs only
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.get_patient_appointments(patient_id, limit, start_date, end_date)
-    
+        return await self.client.get_patient_appointments(
+            patient_id, limit, start_date, end_date
+        )
+
     async def update_appointment(
         self,
         appointment_id: str,
-        update_data: Dict[str, Any],
-        partner_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        update_data: dict[str, Any],
+        partner_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Update an existing appointment.
-        
+
         Args:
             appointment_id: Appointment's unique identifier
             update_data: Fields to update (status, timing, custom attributes, etc.)
             partner_id: If set to 1, uses partner_appointment_id instead of eka appointment_id
-            
+
         Returns:
             Updated appointment details
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.update_appointment(appointment_id, update_data, partner_id)
-    
+        return await self.client.update_appointment(
+            appointment_id, update_data, partner_id
+        )
+
     async def complete_appointment(
-        self,
-        appointment_id: str,
-        completion_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, appointment_id: str, completion_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Mark an appointment as completed.
-        
+
         Args:
             appointment_id: Appointment's unique identifier
             completion_data: Completion details including status and notes
-            
+
         Returns:
             Completion confirmation with updated appointment status
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.complete_appointment(appointment_id, completion_data)
-    
+
     async def cancel_appointment(
-        self,
-        appointment_id: str,
-        cancel_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, appointment_id: str, cancel_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Cancel an appointment.
-        
+
         Args:
             appointment_id: Appointment's unique identifier
             cancel_data: Cancellation details including reason and notes
-            
+
         Returns:
             Cancellation confirmation with updated appointment status
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.cancel_appointment(appointment_id, cancel_data)
-    
+
     async def reschedule_appointment(
-        self,
-        reschedule_data_json: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, reschedule_data_json: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Reschedule an appointment to a new date/time.
-        
+
         Args:
             reschedule_data_json: JSON data containing the new appointment timing and details
-            
+
         Returns:
             Rescheduled appointment details with new timing
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
         return await self.client.reschedule_appointment(reschedule_data_json)
-    
-    async def _enrich_appointments_data(self, appointments_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _enrich_appointments_data(
+        self, appointments_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Unified function to enrich appointment data with patient, doctor, and clinic details.
         Works with both single appointments and lists of appointments.
-        
+
         Args:
             appointments_data: Raw appointments data from API
-            
+
         Returns:
             Enriched appointments data with additional context
         """
@@ -485,26 +488,46 @@ class AppointmentService:
                 appointments_list = appointments_data.get("appointments", [])
             elif isinstance(appointments_data, list):
                 appointments_list = appointments_data
-            elif isinstance(appointments_data, dict) and appointments_data.get("appointment_id"):
+            elif isinstance(appointments_data, dict) and appointments_data.get(
+                "appointment_id"
+            ):
                 # Single appointment
                 appointments_list = [appointments_data]
             else:
                 # Unknown structure, return as is
                 return appointments_data
-            
+
             if not appointments_list:
                 return appointments_data
-            
+
             enriched_appointments = []
-            
+
             # Cache for avoiding duplicate API calls
             patients_cache = {}
             doctors_cache = {}
             clinics_cache = {}
-            
+
             for appointment in appointments_list:
                 enriched_appointment = appointment.copy()
-                
+
+                start_time = appointment.get("start_time")
+                if isinstance(start_time, (int, float)):
+                    enriched_appointment["start_time"] = datetime.fromtimestamp(
+                        start_time, tz=timezone(timedelta(hours=5, minutes=30))
+                    ).strftime("%d-%m-%Y %H:%M")
+
+                end_time = appointment.get("end_time")
+                if isinstance(start_time, (int, float)):
+                    enriched_appointment["end_time"] = datetime.fromtimestamp(
+                        end_time, tz=timezone(timedelta(hours=5, minutes=30))
+                    ).strftime("%d-%m-%Y %H:%M")
+
+                created_at = appointment.get("created_at")
+                if isinstance(created_at, (int, float)):
+                    enriched_appointment["created_at"] = datetime.fromtimestamp(
+                        created_at, tz=timezone(timedelta(hours=5, minutes=30))
+                    ).strftime("%d-%m-%Y %H:%M")
+
                 # Enrich with patient details
                 patient_id = appointment.get("patient_id")
                 if patient_id:
@@ -512,8 +535,10 @@ class AppointmentService:
                         self.client.get_patient_details, patient_id, patients_cache
                     )
                     if patient_info:
-                        enriched_appointment["patient_details"] = extract_patient_summary(patient_info)
-                
+                        enriched_appointment["patient_details"] = (
+                            extract_patient_summary(patient_info)
+                        )
+
                 # Enrich with doctor details
                 doctor_id = appointment.get("doctor_id")
                 if doctor_id:
@@ -521,8 +546,10 @@ class AppointmentService:
                         self.client.get_doctor_profile, doctor_id, doctors_cache
                     )
                     if doctor_info:
-                        enriched_appointment["doctor_details"] = extract_doctor_summary(doctor_info)
-                
+                        enriched_appointment["doctor_details"] = extract_doctor_summary(
+                            doctor_info
+                        )
+
                 # Enrich with clinic details
                 clinic_id = appointment.get("clinic_id")
                 if clinic_id:
@@ -530,10 +557,12 @@ class AppointmentService:
                         self.client.get_clinic_details, clinic_id, clinics_cache
                     )
                     if clinic_info:
-                        enriched_appointment["clinic_details"] = extract_clinic_summary(clinic_info)
-                
+                        enriched_appointment["clinic_details"] = extract_clinic_summary(
+                            clinic_info
+                        )
+
                 enriched_appointments.append(enriched_appointment)
-            
+
             # Return enriched data with original structure preserved
             if "appointments" in appointments_data:
                 result = appointments_data.copy()
@@ -543,23 +572,29 @@ class AppointmentService:
                 return enriched_appointments
             else:
                 # Single appointment case
-                return enriched_appointments[0] if enriched_appointments else appointments_data
-                
+                return (
+                    enriched_appointments[0]
+                    if enriched_appointments
+                    else appointments_data
+                )
+
         except Exception as e:
-            logger.warning(f"Failed to enrich appointments data: {str(e)}")
+            logger.warning(f"Failed to enrich appointments data: {e!s}")
             return appointments_data
-    
+
     # Book Health Package Appointment
-    async def book_service(self, booking_data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def book_service(
+        self, booking_data: dict[str, Any], meta: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Book a service/package.
-        
+
         Args:
             booking_data: Booking details
-            
+
         Returns:
             Booked appointment details
-            
+
         Raises:
             EkaAPIError: If the API call fails
         """
