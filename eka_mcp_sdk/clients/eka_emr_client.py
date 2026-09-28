@@ -27,7 +27,6 @@ from ..utils.doctor_discovery_utils import (
     build_elicitation_response,
     build_elicitation_success_response,
     build_plain_availability_from_entries,
-    build_plain_availability_response,
     find_doctor_clinics,
     resolve_hospital_id,
 )
@@ -606,6 +605,7 @@ class EkaEMRClient(BaseEMRClient):
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
+        partner_patient_id: str | None = None,
         reason: str | None = None,
         patient_name: str | None = None,
         dob: str | None = None,
@@ -686,7 +686,6 @@ class EkaEMRClient(BaseEMRClient):
         appointment_data = {
             "clinic_id": clinic_id,
             "doctor_id": doctor_id,
-            "patient_id": patient_id,
             "appointment_details": {
                 "start_time": start_timestamp,
                 "end_time": end_timestamp,
@@ -697,6 +696,11 @@ class EkaEMRClient(BaseEMRClient):
                 "source": "EkaAgents",
             },
         }
+
+        if partner_patient_id:
+            appointment_data["partner_patient_id"] = partner_patient_id
+        else:
+            appointment_data["patient_id"] = patient_id
 
         if tag_ids:
             appointment_data.setdefault("appointment_details", {}).setdefault(

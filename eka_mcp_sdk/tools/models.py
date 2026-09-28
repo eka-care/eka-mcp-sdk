@@ -73,6 +73,10 @@ class AppointmentBookingRequest(BaseModel):
         default="INCLINIC",
         description="Appointment mode: INCLINIC (in-person), VIDEO (telemedicine), or AUDIO (phone call)"
     )
+    partner_patient_id: Optional[str] = Field(
+        None,
+        description="Partner's patient identifier. When set, the appointment is booked against this id instead of patient_id.",
+    )
     reason: Optional[str] = Field(
         None,
         description="Reason for appointment or chief complaint",
