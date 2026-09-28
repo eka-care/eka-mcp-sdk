@@ -411,6 +411,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
         dedup = get_deduplicator()
         dedup_params = {
             "patient_id": booking.patient_id,
+            "partner_patient_id": booking.partner_patient_id,
             "doctor_id": booking.doctor_id,
             "clinic_id": booking.clinic_id,
             "date": booking.date,
@@ -459,6 +460,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 start_time=booking.start_time,
                 end_time=booking.end_time,
                 mode=booking.mode,
+                partner_patient_id=booking.partner_patient_id,
                 reason=booking.reason,
                 patient_name=booking.patient_name,
                 dob=booking.dob,

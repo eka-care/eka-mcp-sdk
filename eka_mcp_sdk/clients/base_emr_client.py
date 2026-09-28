@@ -5,145 +5,138 @@ All EMR client implementations (EkaEMR, Moolchand, etc.) must implement this int
 This enables workspace-agnostic tool implementations via the factory pattern.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
+from abc import abstractmethod
+from typing import Any
+
 from .base_client import BaseEkaClient
+
 
 class BaseEMRClient(BaseEkaClient):
     """Abstract interface for EMR client implementations.
-    
-    All EMR clients must implement these methods to be usable by 
+
+    All EMR clients must implement these methods to be usable by
     the factory pattern and workspace routing.
     """
-    
+
     @abstractmethod
     def get_workspace_name(self) -> str:
         """Return the name of the workspace this client handles."""
-        pass
-    
+
     # ==================== Patient Operations ====================
-    
+
     async def mobile_number_verification(
-        self,
-        mobile_number: str,
-        otp: Optional[str] = None,
-        stage: str = "send_otp"
-    ) -> Dict[str, Any]:
+        self, mobile_number: str, otp: str | None = None, stage: str = "send_otp"
+    ) -> dict[str, Any]:
         """
         Unified mobile number verification - handles both OTP send and verify stages.
         """
-        pass
 
     async def authentication_elicitation(
         self,
         method: str,
-        mobile_number: Optional[str] = None,
-        email_address: Optional[str] = None,
-        meta: Optional[Dict[Any, Any]] = None
-    ) -> Dict[str, Any]:
+        mobile_number: str | None = None,
+        email_address: str | None = None,
+        meta: dict[Any, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Unified mobile number verification - handles both OTP send and verify stages.
         """
-        pass
-    
+
     @abstractmethod
-    async def add_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def add_patient(self, patient_data: dict[str, Any]) -> dict[str, Any]:
         """Create a patient profile."""
-        pass
-    
+
     @abstractmethod
-    async def get_patient_details(self, patient_id: str) -> Dict[str, Any]:
+    async def get_patient_details(self, patient_id: str) -> dict[str, Any]:
         """Retrieve patient profile."""
-        pass
-    
+
     @abstractmethod
-    async def search_patients(self, prefix: str, limit: Optional[int] = None, select: Optional[str] = None) -> Dict[str, Any]:
+    async def search_patients(
+        self, prefix: str, limit: int | None = None, select: str | None = None
+    ) -> dict[str, Any]:
         """Search patient profiles by username, mobile, or full name."""
-        pass
-    
+
     @abstractmethod
-    async def list_patients(self, page_no: int, page_size: Optional[int] = None, select: Optional[str] = None,
-                           from_timestamp: Optional[int] = None, include_archived: bool = False) -> Dict[str, Any]:
+    async def list_patients(
+        self,
+        page_no: int,
+        page_size: int | None = None,
+        select: str | None = None,
+        from_timestamp: int | None = None,
+        include_archived: bool = False,
+    ) -> dict[str, Any]:
         """List patient profiles with pagination."""
-        pass
-    
+
     @abstractmethod
-    async def update_patient(self, patient_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_patient(
+        self, patient_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update patient profile details."""
-        pass
-    
+
     @abstractmethod
-    async def archive_patient(self, patient_id: str) -> Dict[str, Any]:
+    async def archive_patient(self, patient_id: str) -> dict[str, Any]:
         """Archive patient profile."""
-        pass
-    
+
     @abstractmethod
-    async def get_patient_by_mobile(self, mobile: str, full_profile: bool = False) -> Dict[str, Any]:
+    async def get_patient_by_mobile(
+        self, mobile: str, full_profile: bool = False
+    ) -> dict[str, Any]:
         """Retrieve patient profiles by mobile number."""
-        pass
-    
+
     # ==================== Doctor & Clinic Operations ====================
-    
+
     @abstractmethod
-    async def get_business_entities(self) -> Dict[str, Any]:
+    async def get_business_entities(self) -> dict[str, Any]:
         """Get Clinic and Doctor details for the business."""
-        pass
-    
+
     @abstractmethod
-    async def get_clinic_details(self, clinic_id: str) -> Dict[str, Any]:
+    async def get_clinic_details(self, clinic_id: str) -> dict[str, Any]:
         """Get Clinic details."""
-        pass
-    
+
     @abstractmethod
-    async def get_doctor_profile(self, doctor_id: str) -> Dict[str, Any]:
+    async def get_doctor_profile(self, doctor_id: str) -> dict[str, Any]:
         """Get Doctor profile."""
-        pass
-    
+
     @abstractmethod
-    async def get_doctor_services(self, doctor_id: str) -> Dict[str, Any]:
+    async def get_doctor_services(self, doctor_id: str) -> dict[str, Any]:
         """Get Doctor services."""
-        pass
 
     # ==================== CRM Operations ====================
 
     @abstractmethod
-    async def create_crm_lead(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_crm_lead(self, lead_data: dict[str, Any]) -> dict[str, Any]:
         """Create a CRM lead."""
-        pass
 
     # ==================== Appointment Operations ====================
-    
+
     @abstractmethod
-    async def get_appointment_slots(self, doctor_id: str, clinic_id: str, start_date: str, end_date: str) -> Dict[str, Any]:
+    async def get_appointment_slots(
+        self, doctor_id: str, clinic_id: str, start_date: str, end_date: str
+    ) -> dict[str, Any]:
         """Get Appointment Slots for a doctor at a clinic within a date range."""
-        pass
-    
+
     @abstractmethod
-    async def get_available_slots(self,
-        doctor_id: str,
-        clinic_id: str,
-        date: str
-    ) -> Dict[str, Any]:
+    async def get_available_slots(
+        self, doctor_id: str, clinic_id: str, date: str
+    ) -> dict[str, Any]:
         """Get Appointment Slots for a specific date in common contract format."""
-        pass
 
     @abstractmethod
     async def get_available_dates(
         self, doctor_id: str, clinic_id: str, start_date: str, end_date: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get available appointment dates in common contract format."""
-        pass
-    
+
     @abstractmethod
     async def doctor_availability_elicitation(
         self,
         doctor_id: str,
-        clinic_id: Optional[str] = None,
-        preferred_date: Optional[str] = None,
-        preferred_slot_time: Optional[str] = None,
+        clinic_id: str | None = None,
+        preferred_date: str | None = None,
+        preferred_slot_time: str | None = None,
         supports_elicitation: bool = True,
-        meta: Optional[Dict[Any, Any]] = None,
-    ) -> Dict[str, Any]:
+        meta: dict[Any, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Get doctor availability for appointment booking in UI contract format.
 
@@ -151,13 +144,13 @@ class BaseEMRClient(BaseEkaClient):
         If supports_elicitation is False, returns plain availability data
         without the doctor_card UI component.
         """
-        pass
 
     @abstractmethod
-    async def book_appointment(self, appointment_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def book_appointment(
+        self, appointment_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Book Appointment Slot (raw API call)."""
-        pass
-    
+
     @abstractmethod
     async def book_appointment_with_validation(
         self,
@@ -168,123 +161,142 @@ class BaseEMRClient(BaseEkaClient):
         start_time: str,
         end_time: str,
         mode: str = "in_clinic",
-        reason: Optional[str] = None,
-        patient_name: Optional[str] = None,
-        dob: Optional[str] = None,
-        gender: Optional[str] = None,
-        tag_ids: Optional[List[str]] = None,
-        session_id: Optional[str] = None,
-        token: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        partner_patient_id: str | None = None,
+        reason: str | None = None,
+        patient_name: str | None = None,
+        dob: str | None = None,
+        gender: str | None = None,
+        tag_ids: list[str] | None = None,
+        session_id: str | None = None,
+        token: int | None = None,
+    ) -> dict[str, Any]:
         """
         Book appointment with automatic availability checking and alternate slot suggestions.
-        
+
         Returns:
             - If slot available: {"success": True, "data": {...}, "booked_slot": {...}}
             - If slot unavailable: {"success": False, "slot_unavailable": True, "alternate_slots": [...]}
         """
-        pass
-    
+
     @abstractmethod
-    async def get_appointments(self, doctor_id: Optional[str] = None, clinic_id: Optional[str] = None,
-                              patient_id: Optional[str] = None, start_date: Optional[str] = None,
-                              end_date: Optional[str] = None, page_no: int = 0) -> Dict[str, Any]:
+    async def get_appointments(
+        self,
+        doctor_id: str | None = None,
+        clinic_id: str | None = None,
+        patient_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        page_no: int = 0,
+    ) -> dict[str, Any]:
         """Get Appointments with flexible filters."""
-        pass
-    
+
     @abstractmethod
-    async def get_appointment_details(self, appointment_id: str, partner_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_appointment_details(
+        self, appointment_id: str, partner_id: str | None = None
+    ) -> dict[str, Any]:
         """Get Appointment Details by appointment ID."""
-        pass
-    
+
     @abstractmethod
-    async def update_appointment(self, appointment_id: str, update_data: Dict[str, Any], partner_id: Optional[str] = None) -> Dict[str, Any]:
+    async def update_appointment(
+        self,
+        appointment_id: str,
+        update_data: dict[str, Any],
+        partner_id: str | None = None,
+    ) -> dict[str, Any]:
         """Update Appointment."""
-        pass
-    
+
     @abstractmethod
-    async def complete_appointment(self, appointment_id: str, completion_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def complete_appointment(
+        self, appointment_id: str, completion_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Complete Appointment."""
-        pass
-    
+
     @abstractmethod
-    async def cancel_appointment(self, appointment_id: str, cancel_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def cancel_appointment(
+        self, appointment_id: str, cancel_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Cancel Appointment."""
-        pass
-    
+
     @abstractmethod
-    async def reschedule_appointment(self, appointment_id: str, reschedule_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def reschedule_appointment(
+        self, appointment_id: str, reschedule_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Reschedule Appointment."""
-        pass
-    
+
     @abstractmethod
-    async def get_patient_appointments(self, patient_id: str, limit: Optional[int] = None,
-                                       start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+    async def get_patient_appointments(
+        self,
+        patient_id: str,
+        limit: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """Get all appointments for a patient profile."""
-        pass
-    
+
     # ==================== Prescription Operations ====================
-    
+
     @abstractmethod
-    async def get_prescription_details(self, prescription_id: str) -> Dict[str, Any]:
+    async def get_prescription_details(self, prescription_id: str) -> dict[str, Any]:
         """Get Prescription details."""
-        pass
 
     # ==================== Medical Records Operations ====================
 
     @abstractmethod
-    async def list_medical_records(self, patient_id: str, updated_after: Optional[int] = None,
-                                   offset: Optional[str] = None) -> Dict[str, Any]:
+    async def list_medical_records(
+        self,
+        patient_id: str,
+        updated_after: int | None = None,
+        offset: str | None = None,
+    ) -> dict[str, Any]:
         """List a patient's medical records (documents)."""
-        pass
 
     @abstractmethod
-    async def get_medical_record(self, patient_id: str, document_id: str) -> Dict[str, Any]:
+    async def get_medical_record(
+        self, patient_id: str, document_id: str
+    ) -> dict[str, Any]:
         """Get a single medical record's metadata and download URL."""
-        pass
 
     @abstractmethod
-    async def delete_medical_record(self, patient_id: str, document_id: str) -> Dict[str, Any]:
+    async def delete_medical_record(
+        self, patient_id: str, document_id: str
+    ) -> dict[str, Any]:
         """Delete a patient's medical record (document)."""
-        pass
 
     @abstractmethod
-    async def initiate_medical_record_upload(self, patient_id: str,
-                                             batch_request: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def initiate_medical_record_upload(
+        self, patient_id: str, batch_request: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Register document metadata and obtain presigned upload URLs."""
-        pass
 
     # ==================== Services Tools ====================
     @abstractmethod
     async def service_availability_elicitation(
         self,
-        suggested_service_ids: Optional[List[str]] = None,
-        service_id: Optional[str] = None,
-        hospital_id: Optional[str] = None,
-        preferred_date: Optional[str] = None,
-        preferred_slot_time: Optional[str] = None,
+        suggested_service_ids: list[str] | None = None,
+        service_id: str | None = None,
+        hospital_id: str | None = None,
+        preferred_date: str | None = None,
+        preferred_slot_time: str | None = None,
         supports_elicitation: bool = True,
-        meta: Optional[Dict[Any, Any]] = None,
-    ) -> Dict[str, Any]:
+        meta: dict[Any, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Get Service availability for booking in UI contract format.
         Returns service details, available dates, and slots with UI callbacks.
         If supports_elicitation is False, returns plain availability data
         without the doctor_card UI component.
         """
-        pass
 
     @abstractmethod
     async def book_service(
-        self, booking_data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, booking_data: dict[str, Any], meta: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Book an appointment for a health package.
         """
-        pass
 
     # ==================== Lifecycle ====================
-    
+
     async def close(self) -> None:
         """Close HTTP client connections."""
         await self._http_client.aclose()
