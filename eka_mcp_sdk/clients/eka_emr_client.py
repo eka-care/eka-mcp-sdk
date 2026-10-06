@@ -686,6 +686,7 @@ class EkaEMRClient(BaseEMRClient):
         appointment_data = {
             "clinic_id": clinic_id,
             "doctor_id": doctor_id,
+            "created_by_patient": True,
             "appointment_details": {
                 "start_time": start_timestamp,
                 "end_time": end_timestamp,
