@@ -700,6 +700,16 @@ class EkaEMRClient(BaseEMRClient):
 
         if partner_patient_id:
             appointment_data["partner_patient_id"] = partner_patient_id
+            name_parts = (patient_name or "").strip().split(None, 1)
+            first_name = name_parts[0] if name_parts else ""
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
+            appointment_data["patient_name"] = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "middle_name": "",
+                "dob": dob,
+                "gender": gender,
+            }
         else:
             appointment_data["patient_id"] = patient_id
 
