@@ -454,21 +454,22 @@ class AppointmentService:
         return await self.client.cancel_appointment(appointment_id, cancel_data)
 
     async def reschedule_appointment(
-        self, reschedule_data_json: dict[str, Any]
+        self, appointment_id: str, reschedule_data: dict[str, Any]
     ) -> dict[str, Any]:
         """
         Reschedule an appointment to a new date/time.
 
         Args:
-            reschedule_data_json: JSON data containing the new appointment timing and details
+            appointment_id: Appointment's unique identifier
+            reschedule_data: New timing (new_date, new_start_time, new_end_time)
 
         Returns:
-            Rescheduled appointment details with new timing
+            The new appointment created by the reschedule
 
         Raises:
             EkaAPIError: If the API call fails
         """
-        return await self.client.reschedule_appointment(reschedule_data_json)
+        return await self.client.reschedule_appointment(appointment_id, reschedule_data)
 
     async def _enrich_appointments_data(
         self, appointments_data: dict[str, Any]

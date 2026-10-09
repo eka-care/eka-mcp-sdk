@@ -159,9 +159,9 @@ class RescheduleAppointmentRequest(BaseModel):
         description="New start time in HH:MM 24-hour format (e.g., 15:00 for 3pm, 12:00 for noon)",
         pattern=TIME_24H_PATTERN,
     )
-    new_end_time: Optional[str] = Field(
-        None,
-        description="New end time in HH:MM 24-hour format (fetch from slots data time difference if not provided)",
+    new_end_time: str = Field(
+        ...,
+        description="New end time in HH:MM 24-hour format (use the slot's end time from get_appointment_slots)",
         pattern=TIME_24H_PATTERN,
     )
 
