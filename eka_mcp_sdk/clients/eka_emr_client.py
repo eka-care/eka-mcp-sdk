@@ -712,15 +712,15 @@ class EkaEMRClient(BaseEMRClient):
         first_name = name_parts[0] if name_parts else ""
         last_name = name_parts[1] if len(name_parts) > 1 else ""
         if first_name or last_name:
-            appointment_data["patient_name"] = {
+            appointment_data["patient_details"] = {
                 "first_name": first_name,
                 "last_name": last_name,
                 "middle_name": "",
             }
         if dob:
-            appointment_data["patient_name"]["dob"] = dob.strftime("%Y-%m-%d")
+            appointment_data["patient_details"]["dob"] = dob.strftime("%Y-%m-%d")
         if gender:
-            appointment_data["patient_name"]["gender"] = gender.upper()
+            appointment_data["patient_details"]["gender"] = gender.upper()
 
         if reason:
             appointment_data["appointment_details"]["reason"] = reason
