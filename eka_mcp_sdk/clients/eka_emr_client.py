@@ -835,18 +835,46 @@ class EkaEMRClient(BaseEMRClient):
         )
 
     async def reschedule_appointment(
-        self, reschedule_data_json: dict[str, Any]
+        self, appointment_id: str, reschedule_data: dict[str, Any]
     ) -> dict[str, Any]:
-        """Reschedule Appointment."""
-        # return await self._make_request(
-        #     method="PUT",
-        #     endpoint=f"/dr/v1/appointment/{appointment_id}/reschedule",
-        #     data=reschedule_data
-        # )
-        return {
-            "error": "Not implemented",
-            "message": "reschedule_appointment is not available for this workspace",
-        }
+        """Reschedule Appointment. Returns the new appointment created by Eka."""
+        date = reschedule_data["new_date"]
+
+        # Check the new slot is available on the appointment's doctor/clinic schedule
+        appointment = await self.get_appointment_details(appointment_id)
+        clinic_id = appointment.get("clinic_id")
+        slots_result = await self.get_appointment_slots_raw(
+            appointment.get("doctor_id"),
+            clinic_id,
+            f"{date}T00:00:00.000Z",
+            f"{date}T23:59:59.000Z",
+        )
+        all_slots = extract_all_slots_from_schedule(
+            validate_clinic_schedule(slots_result, clinic_id) or []
+        )
+        is_available, _, _ = check_slot_availability(
+            all_slots, date, reschedule_data["new_start_time"], reschedule_data["new_end_time"]
+        )
+        if not is_available:
+            raise EkaAPIError(
+                "Requested slot is not available",
+                status_code=409,
+                error_code="SLOT_NOT_AVAILABLE",
+            )
+
+        IST = timezone(timedelta(hours=5, minutes=30))
+        start = datetime.strptime(f"{date} {reschedule_data['new_start_time']}", "%Y-%m-%d %H:%M")
+        end = datetime.strptime(f"{date} {reschedule_data['new_end_time']}", "%Y-%m-%d %H:%M")
+
+        return await self._make_request(
+            method="PATCH",
+            endpoint=f"/appointments/v1/{appointment_id}/reschedule",
+            data={
+                "start_time": int(start.replace(tzinfo=IST).timestamp()),
+                "end_time": int(end.replace(tzinfo=IST).timestamp()),
+            },
+            include_auth=False,
+        )
 
     async def park_appointment(
         self, appointment_id: str, park_data: dict[str, Any]

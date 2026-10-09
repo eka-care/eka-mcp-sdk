@@ -1113,7 +1113,7 @@ def register_appointment_tools(mcp: FastMCP) -> None:
 
         """
         await ctx.info(
-            f"[reschedule_appointment] Rescheduling appointment: {RescheduleAppointmentRequest}"
+            f"[reschedule_appointment] Rescheduling appointment: {reschedule_data.appointment_id}"
         )
 
         try:
@@ -1125,9 +1125,9 @@ def register_appointment_tools(mcp: FastMCP) -> None:
                 workspace_id, access_token, custom_headers
             )
             appointment_service = AppointmentService(client)
-            reschedule_data_json = reschedule_data.model_dump(exclude_none=True)
             result = await appointment_service.reschedule_appointment(
-                reschedule_data_json
+                reschedule_data.appointment_id,
+                reschedule_data.model_dump(exclude_none=True, exclude={"appointment_id"}),
             )
 
             await ctx.info("[reschedule_appointment] Completed successfully\n")
