@@ -34,13 +34,8 @@ class BaseEkaClient(ABC):
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        include_auth: bool = True,
     ) -> dict[str, Any]:
-        """Make authenticated request to Eka.care API.
-
-        Set include_auth=False to skip the Bearer auth headers and rely only on
-        the headers forwarded from the incoming request.
-        """
+        """Make authenticated request to Eka.care API."""
         # Get current settings and initialize url for exception handling
         api_base = api_base_url or settings.api_base_url
         url = f"{api_base}{endpoint}"
@@ -54,7 +49,7 @@ class BaseEkaClient(ABC):
 
             headers["client-id"] = settings.client_id
 
-            if include_auth and (self.access_token or settings.client_secret):
+            if self.access_token or settings.client_secret:
                 # Get authentication context
                 auth_context = await self._auth_manager.get_auth_context()
 

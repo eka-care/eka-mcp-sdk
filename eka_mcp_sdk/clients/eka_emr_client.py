@@ -887,7 +887,6 @@ class EkaEMRClient(BaseEMRClient):
                 "start_time": int(start.replace(tzinfo=IST).timestamp()),
                 "end_time": int(end.replace(tzinfo=IST).timestamp()),
             },
-            include_auth=False,
         )
 
     async def park_appointment(
