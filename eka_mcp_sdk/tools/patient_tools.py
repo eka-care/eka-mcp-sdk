@@ -510,7 +510,7 @@ def register_patient_tools(mcp: FastMCP) -> None:
         """
 
         if not get_supports_elicitation():
-            mobile = get_whatsapp_mobile_number()
+            mobile = get_whatsapp_mobile_number() or mobile
 
         try:
             token: AccessToken | None = get_access_token()
