@@ -514,7 +514,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         Typical use cases (guidance, not strict rules):
         - Appointment booking intent or rescheduling flows
         - When doctor availability or doctor details need to be discovered or displayed to the user
-        - After search_doctor_tool returns matches and the user needs to choose one
+        - After a doctor search returns matches and the user needs to choose one
         - When a specific doctor is already in context and the user wants to see slots
 
         Parameters — pass exactly ONE of `suggested_doctor_ids` OR `doctor_id`:
@@ -526,10 +526,9 @@ def register_discovery_tools(mcp: FastMCP) -> None:
 
         Sourcing IDs (important — do not hallucinate):
         All IDs (doctor_id, suggested_doctor_ids, hospital_id) must come from one of:
-        – a prior search_doctor_tool result in this conversation
+        – a prior doctor search result in this conversation
         – a prior result of this tool
         – explicit conversation context where the ID was provided
-        If no such ID is available, call search_doctor_tool first instead of guessing.
 
         Constraints:
         - Do not pass both suggested_doctor_ids and doctor_id
@@ -595,7 +594,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         Typical use cases (guidance, not strict rules):
         - Service booking intent or rescheduling flows
         - When service availability or service details need to be discovered or displayed to the user
-        - After search_service_tool returns matches and the user needs to choose one
+        - After a service search returns matches and the user needs to choose one
         - When a specific service is already in context and the user wants to see slots
 
         Parameters — pass exactly ONE of `suggested_service_ids` OR `service_id`:
@@ -607,10 +606,9 @@ def register_discovery_tools(mcp: FastMCP) -> None:
 
         Sourcing IDs (important — do not hallucinate):
         All IDs (service_id, suggested_service_ids, hospital_id) must come from one of:
-        – a prior search_service_tool result in this conversation
+        – a prior service search result in this conversation
         – a prior result of this tool
         – explicit conversation context where the ID was provided
-        If no such ID is available, call search_service_tool first instead of guessing.
 
         Constraints:
         - Do not pass both suggested_service_ids and service_id
